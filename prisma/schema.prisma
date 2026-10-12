@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Worker {
+  id              String           @id @default(cuid())
+  code            String?          // Mã NV
+  fullName        String           // Họ và tên
+  dob             String?          // Ngày sinh
+  gender          String?          // Giới tính
+  idCard          String           @unique // số CCCD
+  idCardDate      String?          // Ngày cấp
+  idCardPlace     String?          // Nơi cấp
+  phone           String?          // SĐT
+  address         String?          // Địa chỉ / Quê quán
+  province        String?          // Tỉnh/Thành
+  recruiter       String?          // Chuyên viên tuyển dụng
+  team            String?          // Đội nhóm
+  source          String?          // Nguồn
+  isBlacklisted   Boolean          @default(false)
+  blacklistReason String?
+  isWhitelisted   Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  assignments     WorkAssignment[]
+  bonusRecords    BonusRecord[]
+  bankAccounts    BankAccount[]
+}
+
+model WorkAssignment {
+  id                     String    @id @default(cuid())
+  workerId               String
+  worker                 Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  interviewFactory       String    // Nhà máy PV (Luxshare QC, Canon, Goertek, Fushan, Amphenol, Foxconn, Luxshare VT, LG...)
+  workingFactory         String?   // Nhà máy làm việc
+  contractType           String?   // Loại HD
+  status                 String    @default("Đang chờ phỏng vấn") // Tình trạng: "Đang làm việc", "Đã nghỉ việc", ...
+  leaveDate              String?   // Ngày NH (Ngày Nghỉ việc)
+  leaveReason            String?   // Lý do nghỉ
+  shuttleBusKtx          String?   // Đón xe - KTX
+  interviewDate          String?   // Ngày PV
+  expectedTrainingDate   String?   // Ngày Đào tạo dự kiến
+  expectedTrainingStatus String?   // Tình trạng Đào tạo dự kiến
+  standardTrainingDate   String?   // Ngày đào tạo chuẩn
+  onboardingMonth        String?   // Tháng nhận việc (T01.2026...)
+  recruiter              String?   // Tuyển dụng
+  source                 String?   // Nguồn
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  bonusRecords           BonusRecord[]
+}
+
+model BonusRecord {
+  id              String          @id @default(cuid())
+  workerId        String
+  worker          Worker          @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  assignmentId    String?
+  assignment      WorkAssignment? @relation(fields: [assignmentId], references: [id])
+  company         String?         // Công ty
+  month           String          // Tháng (T01.2026, T02.2026...)
+  interviewDate   String?         // Ngày PV
+  policy          String?         // Chính sách
+  workerCode      String?         // Mã nhân viên
+  bonus1          Float?          @default(0) // Thưởng lần 1
+  bonus2          Float?          @default(0) // Thưởng lần 2
+  bonus3          Float?          @default(0) // Thưởng lần 3
+  bonus4          Float?          @default(0) // Thưởng lần 4
+  bonus5          Float?          @default(0) // Thưởng lần 5
+  bonus6          Float?          @default(0) // Thưởng lần 6
+  bonus7          Float?          @default(0) // Thưởng lần 7
+  totalBonus      Float?          @default(0) // Tổng thưởng
+  status          String          @default("DRAFT") // DRAFT, REVIEWED, APPROVED, LOCKED
+  note            String?
+  approvedBy      String?
+  approvedAt      DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model BankAccount {
+  id                    String    @id @default(cuid())
+  workerId              String
+  worker                Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  bankName              String    // Ngân hàng
+  bankCode              String?   // Mã ngân hàng (VCB, TCB, MB...)
+  accountNumber         String    // STK
+  accountHolderName     String    // Họ tên chủ tài khoản
+  isNameVerified        Boolean   @default(false) // Trùng khớp tên CCCD
+  isAuthorized          Boolean   @default(false) // Ủy quyền / mượn tài khoản
+  authorizedRelation    String?   // Mối quan hệ ủy quyền
+  verificationStatus    String    @default("UNVERIFIED") // VALID, MISMATCH, AUTHORIZED, UNVERIFIED
+  warningMessage        String?   // Cảnh báo sai STK / Lệch tên
+  checkedBy             String?   // Người check
+  checkResult           String?   // Kết Quả
+  checkedAt             DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model BonusPolicy {
+  id          String   @id @default(cuid())
+  name        String   // Tên chính sách (VD: Chính sách mùa vụ Luxshare 2026)
+  factory     String   // Nhà máy áp dụng
+  description String?
+  rulesJson   String   // Chi tiết JSON: [{step: 1, milestone: "3 công", amount: 300000}, ...]
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String   // CREATE, UPDATE, DELETE, APPROVE, EXPORT
+  module    String   // WORKER, BONUS, BANK, SYSTEM
+  details   String?
+  operator  String?  @default("Hệ thống")
+  createdAt DateTime @default(now())
+}

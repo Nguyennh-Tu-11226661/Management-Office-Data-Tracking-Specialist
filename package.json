@@ -1,0 +1,40 @@
+{
+  "name": "l-incentive",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/run-next.cjs dev",
+    "build": "node scripts/run-next.cjs build",
+    "start": "node scripts/run-next.cjs start",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate",
+    "postinstall": "prisma generate",
+    "auth:setup": "node scripts/create-user.cjs",
+    "test": "node tests/payment-safety.cjs",
+    "test:integration": "node tests/integration.cjs",
+    "dev:local": "node scripts/run-next.cjs dev"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.5.2",
+    "@ant-design/cssinjs": "^1.23.0",
+    "@prisma/client": "^5.22.0",
+    "antd": "^5.24.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.475.0",
+    "next": "^14.2.24",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^3.0.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.19",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.2",
+    "prisma": "^5.22.0",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3"
+  }
+}

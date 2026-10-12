@@ -1,0 +1,8 @@
+const {spawn}=require('node:child_process');
+const path=require('node:path');
+const mode=process.argv[2];
+if(!['dev','build','start'].includes(mode))throw new Error('Invalid Next.js mode');
+const args=[path.resolve('node_modules/next/dist/bin/next'),mode,...(mode==='build'?[]:['-H','127.0.0.1','-p','3000'])];
+const child=spawn(process.execPath,args,{env:{...process.env,LOCAL_BUILD_DIR:mode==='dev'?'.next-local':'.next-production'},stdio:'inherit'});
+child.on('exit',(code)=>{process.exitCode=code||0;});
+child.on('error',()=>{console.error('Không thể khởi động Next.js');process.exitCode=1;});

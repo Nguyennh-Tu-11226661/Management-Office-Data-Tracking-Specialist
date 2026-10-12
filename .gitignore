@@ -1,0 +1,20 @@
+
+.local/
+.env
+*.db
+*.db-journal
+.next/
+node_modules/
+*.tsbuildinfo
+
+.next-local/
+.next-production/
+.next-qa/
+
+# Local secrets, databases, and preview screenshots
+.env.*
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+docs/preview-*.jpg
