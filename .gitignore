@@ -18,3 +18,7 @@ node_modules/
 *.sqlite
 *.sqlite3
 docs/preview-*.jpg
+
+.generated/
+
+.next-evolution/

@@ -37,6 +37,8 @@ export default function BonusesPage() {
     const [bonuses, setBonuses] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [selectedMonth, setSelectedMonth] = useState('T01.2026');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     const [selectedCompany, setSelectedCompany] = useState('');
     // Modal thêm thưởng
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -310,7 +312,25 @@ export default function BonusesPage() {
 
       {/* Bonus Table */}
       <Card className="shadow-sm border-slate-200 overflow-hidden">
-        <Table columns={columns} dataSource={bonuses} rowKey="id" loading={loading} pagination={{ pageSize: 10, showSizeChanger: true }} bordered size="middle"/>
+        <Table
+          columns={columns}
+          dataSource={bonuses}
+          rowKey="id"
+          loading={loading}
+          pagination={{
+            current: currentPage,
+            pageSize: pageSize,
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100', '200'],
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size);
+            },
+            showTotal: (total, range) => `${range[0]} - ${range[1]} / ${total} bản ghi`,
+          }}
+          bordered
+          size="middle"
+        />
       </Card>
 
       {/* Modal Thêm Thưởng */}

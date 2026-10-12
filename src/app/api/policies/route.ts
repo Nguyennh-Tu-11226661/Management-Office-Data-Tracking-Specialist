@@ -1,50 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { guard, identity } from '@/lib/auth';
-import { validAmount } from '@/lib/payment-safety';
-export const dynamic = 'force-dynamic';
-export async function GET(request: NextRequest) { const denied = await guard(request); if (denied)
-    return denied; try {
-    return NextResponse.json({ success: true, data: await prisma.bonusPolicy.findMany({ orderBy: { createdAt: 'desc' } }) });
-}
-catch {
-    return NextResponse.json({ success: false, message: 'Không thể tải chính sách' }, { status: 500 });
-} }
-async function save(request: NextRequest, edit: boolean) {
-    const denied = await guard(request, 'bonus:write');
-    if (denied)
-        return denied;
-    let body: any;
-    try {
-        body = await request.json();
-    }
-    catch {
-        return NextResponse.json({ success: false, message: 'JSON không hợp lệ' }, { status: 400 });
-    }
-    if (typeof body?.name !== 'string' || !body.name.trim() || body.name.length > 200 || typeof body.factory !== 'string' || !body.factory.trim() || body.factory.length > 200 || !Array.isArray(body.rules) || body.rules.length !== 7 || body.rules.some((r: any, i: number) => r?.step !== i + 1 || typeof r.milestone !== 'string' || !r.milestone.trim() || r.milestone.length > 200 || !validAmount(r.amount)) || typeof body.isActive !== 'boolean')
-        return NextResponse.json({ success: false, message: 'Cần tên, nhà máy và đủ 7 mốc liên tiếp với số tiền nguyên không âm' }, { status: 400 });
-    const actor = (await identity(request))!;
-    try {
-        const result = await prisma.$transaction(async (tx) => {
-            const data = { name: body.name.trim(), factory: body.factory.trim(), rulesJson: JSON.stringify(body.rules), isActive: body.isActive, description: typeof body.description === 'string' ? body.description.slice(0, 2000) : null };
-            if (edit) {
-                const current = await tx.bonusPolicy.findUnique({ where: { id: body.id || '' } });
-                if (!current)
-                    return { error: 'Không tìm thấy chính sách', status: 404 };
-                if (body.updatedAt !== current.updatedAt.toISOString())
-                    return { error: 'Chính sách đã thay đổi, hãy tải lại', status: 409 };
-            }
-            const saved = edit ? await tx.bonusPolicy.update({ where: { id: body.id }, data }) : await tx.bonusPolicy.create({ data });
-            await tx.auditLog.create({ data: { action: edit ? 'UPDATE' : 'CREATE', module: 'BONUS', operator: actor.username, details: `${edit ? 'Sửa' : 'Tạo'} chính sách ${saved.id}. Không thay đổi thưởng đã ghi nhận.` } });
-            return { data: saved };
-        });
-        if ('error' in result)
-            return NextResponse.json({ success: false, message: result.error }, { status: result.status });
-        return NextResponse.json({ success: true, data: result.data }, { status: edit ? 200 : 201 });
-    }
-    catch {
-        return NextResponse.json({ success: false, message: 'Không thể lưu chính sách' }, { status: 500 });
-    }
-}
-export const POST = (request: NextRequest) => save(request, false);
-export const PUT = (request: NextRequest) => save(request, true);
+import {NextRequest,NextResponse} from 'next/server';
+import {prisma} from '@/lib/prisma';
+import {guard,identity} from '@/lib/auth';
+import {text,day,DomainError,resultError,rulesOf} from '@/lib/domain';
+export const dynamic='force-dynamic';
+export async function GET(r:NextRequest){const denied=await guard(r);if(denied)return denied;try{return NextResponse.json({success:true,data:await prisma.bonusPolicy.findMany({include:{order:true},orderBy:{createdAt:'desc'}})});}catch(e){return resultError(e);}}
+async function save(r:NextRequest,edit:boolean){const denied=await guard(r,'bonus:write');if(denied)return denied;try{const b=await r.json(),actor=(await identity(r))!,name=text(b.name,'tên chính sách'),factory=text(b.factory,'nhà máy'),rules=rulesOf(b.rules);
+ const from=b.effectiveFrom?day(b.effectiveFrom,'ngày bắt đầu'):null,to=b.effectiveTo?day(b.effectiveTo,'ngày kết thúc'):null;
+ if(!!from!==!!to||from&&to&&from>to)throw new DomainError('Cần đủ khoảng ngày hiệu lực, kết thúc không trước bắt đầu');
+ if(typeof b.isActive!=='boolean')throw new DomainError('Trạng thái chính sách không hợp lệ');
+ const data=await prisma.$transaction(async tx=>{
+  if(b.orderId){const order=await tx.recruitmentOrder.findUnique({where:{id:b.orderId}});if(!order||order.factory!==factory)throw new DomainError('Đơn hàng không thuộc nhà máy của chính sách');}
+  if(edit){const old=await tx.bonusPolicy.findUnique({where:{id:b.id||''}});if(!old)throw new DomainError('Không tìm thấy chính sách',404);if(b.updatedAt!==old.updatedAt.toISOString())throw new DomainError('Chính sách đã thay đổi, tải lại',409);}
+  const values={name,factory,rulesJson:JSON.stringify(rules),effectiveFrom:from,effectiveTo:to,orderId:b.orderId||null,isActive:b.isActive,description:text(b.description,'ghi chú',false,2000)||null};
+  const policy=edit?await tx.bonusPolicy.update({where:{id:b.id},data:values}):await tx.bonusPolicy.create({data:values});
+  await tx.auditLog.create({data:{module:'BONUS',action:edit?'UPDATE':'CREATE',operator:actor.username,details:`Chính sách ${policy.id}; giữ snapshot các đợt đã áp dụng`}});return policy;
+ });return NextResponse.json({success:true,data},{status:edit?200:201});}catch(e){return resultError(e);}}
+export const POST=(r:NextRequest)=>save(r,false);export const PUT=(r:NextRequest)=>save(r,true);
+
+export async function DELETE(r:NextRequest){const denied=await guard(r,'bonus:write');if(denied)return denied;try{const b=await r.json(),actor=(await identity(r))!;const data=await prisma.$transaction(async tx=>{const old=await tx.bonusPolicy.findUnique({where:{id:text(b.id,'chính sách')}});if(!old)throw new DomainError('Không tìm thấy chính sách',404);if(old.updatedAt.toISOString()!==b.updatedAt)throw new DomainError('Chính sách đã thay đổi',409);const row=await tx.bonusPolicy.update({where:{id:old.id},data:{isActive:false}});await tx.auditLog.create({data:{module:'BONUS',action:'ARCHIVE_POLICY',operator:actor.username,details:`Ngừng dùng chính sách ${old.id}; giữ thưởng đã áp dụng`}});return row;});return NextResponse.json({success:true,data});}catch(e){return resultError(e);}}
