@@ -416,9 +416,8 @@ export default function WorkersPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Input type="month" value={month} onChange={e=>setMonth(e.target.value)} className="w-40" placeholder="Lọc theo tháng"/>
           <a href="/api/excel-engine/export?type=WORKERS">
-            <Input type="month" value={month} onChange={e=>setMonth(e.target.value)} className="w-40"/>
-            <Button onClick={()=>setArchived(!archived)}>{archived?'Xem hồ sơ đang dùng':'Hồ sơ lưu trữ'}</Button>
             <Button icon={<Download className="w-4 h-4"/>}>Xuất Excel DS_TONG</Button>
           </a>
           <Button type="primary" disabled={!canWrite} icon={<UserPlus className="w-4 h-4"/>} onClick={() => {
