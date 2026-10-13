@@ -1,11 +1,12 @@
+import {sourceHeader,sourceMonth} from '@/lib/source-format';
 import * as XLSX from 'xlsx';
 import { cleanFields, WORKER_FIELDS, ASSIGNMENT_FIELDS, validateWorker, validateInterview } from '@/lib/worker-validation';
 const mappings: Record<string, string[]> = {
-    fullName: ['Họ và tên', 'Họ tên'], idCard: ['số CCCD', 'Số CCCD', 'CCCD', 'CMT/CCCD'], phone: ['SĐT', 'Số điện thoại'], code: ['Mã NV'], dob: ['Ngày sinh'], gender: ['Giới tính'], idCardDate: ['Ngày cấp'], idCardPlace: ['Nơi cấp'], address: ['Địa chỉ'], province: ['Tỉnh/Thành'], recruiter: ['Tuyển dụng', 'Tuyển Dụng'], source: ['Nguồn'], interviewFactory: ['Nhà máy PV', 'Công ty'], workingFactory: ['Nhà máy làm việc'], contractType: ['Loại HD'], status: ['Tình trạng', 'TT'], leaveDate: ['Ngày NH'], leaveReason: ['Lý do'], shuttleBusKtx: ['Đón xe - KTX'], interviewDate: ['Ngày PV', 'Ngày phỏng vấn'], passedDate:['Ngày đỗ','Ngày PV đỗ'], interviewResult:['Kết quả PV','Kết Quả PV'], employeeCode:['Mã nhân viên tại công ty','Mã nhân viên'], team:['Team','Đội nhóm'], startDate:['Ngày bắt đầu làm','Ngày vào làm'],orderId:['Mã liên kết đơn hàng'],batchId:['Mã liên kết đợt'], expectedTrainingDate: ['Ngày Đào tạo dự kiến'], expectedTrainingStatus: ['Tình trạng Đào tạo dự kiến'], standardTrainingDate: ['Ngày đào tạo chuẩn'], onboardingMonth: ['Tháng nhận việc', 'Tháng']
+    fullName: ['Họ và tên', 'Họ tên'], idCard: ['số CCCD', 'Số CCCD', 'CCCD', 'CMT/CCCD'], phone: ['SĐT', 'Số điện thoại'], code: ['Mã NV'], dob: ['Ngày sinh'], gender: ['Giới tính'], idCardDate: ['Ngày cấp'], idCardPlace: ['Nơi cấp'], address: ['Địa chỉ'], province: ['Tỉnh/Thành'], recruiter: ['Tuyển dụng', 'Tuyển Dụng'], source: ['Nguồn'], interviewFactory: ['Nhà máy PV', 'Công ty'], workingFactory: ['Nhà máy làm việc'], contractType: ['Loại HD', 'Loại HĐ'], status: ['Tình trạng', 'TT'], leaveDate: ['Ngày NH'], leaveReason: ['Lý do'], shuttleBusKtx: ['Đón xe - KTX', 'Đón xe + KTX'], interviewDate: ['Ngày PV', 'Ngày phỏng vấn'], passedDate:['Ngày đỗ','Ngày PV đỗ'], interviewResult:['Kết quả PV','Kết Quả PV'], employeeCode:['Mã nhân viên tại công ty','Mã nhân viên'], team:['Team','Đội nhóm'], startDate:['Ngày bắt đầu làm','Ngày vào làm'],orderId:['Mã liên kết đơn hàng'],batchId:['Mã liên kết đợt'], expectedTrainingDate: ['Ngày Đào tạo dự kiến'], expectedTrainingStatus: ['Tình trạng Đào tạo dự kiến', 'Tình trạng đào tạo'], standardTrainingDate: ['Ngày đào tạo chuẩn'], onboardingMonth: ['Tháng nhận việc', 'Tháng']
 };
 const dates = ['dob', 'idCardDate', 'leaveDate', 'interviewDate', 'expectedTrainingDate', 'standardTrainingDate','passedDate','startDate'];
 export function parseImportRow(raw: Record<string, unknown>) {
-    const row = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k.trim(), v]));
+    const row = Object.fromEntries(Object.entries(raw).map(([k, v]) => [sourceHeader(k), v]));
     const body: Record<string, string> = {};
     for (const [field, headers] of Object.entries(mappings)) {
         let v = headers.map(h => row[h]).find(v => v !== undefined && v !== null && v !== '');
@@ -21,6 +22,7 @@ export function parseImportRow(raw: Record<string, unknown>) {
         }
         body[field] = String(v).trim();
     }
+    if(body.onboardingMonth)body.onboardingMonth=sourceMonth(body.onboardingMonth,body.interviewDate||'');
     const results:Record<string,string>={'Đỗ':'PASS','Đạt phỏng vấn':'PASS','Trượt':'FAIL','Trượt phỏng vấn':'FAIL','Bỏ':'ABANDONED','Bỏ phỏng vấn':'ABANDONED','Chờ kết quả':'PENDING','Chưa xác nhận':'UNKNOWN'};
     if(body.interviewResult)body.interviewResult=results[body.interviewResult]||body.interviewResult;
     else if(['Đỗ','Đạt phỏng vấn','Trượt phỏng vấn','Bỏ phỏng vấn'].includes(body.status))body.interviewResult=results[body.status];

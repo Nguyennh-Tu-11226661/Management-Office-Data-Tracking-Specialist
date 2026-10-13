@@ -1,3 +1,5 @@
+import {sourceMonth,sourceRewardAmount,sourceStatuses} from '@/lib/source-format';
+import {dateKey} from '@/lib/worker-validation';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import * as XLSX from 'xlsx';
@@ -7,7 +9,7 @@ import { parseImportRow } from '@/lib/worker-import';
 import { assignmentRelations, today, day } from '@/lib/domain';
 
 export async function POST(request: NextRequest) {
-  const denied = await guard(request, 'worker:write');
+  const denied = await guard(request);
   if (denied) return denied;
 
   try {
@@ -97,6 +99,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const typeDenied=await guard(request,detectedType==='DS_THUONG'?'bonus:write':detectedType==='BANK_ACCOUNTS'?'bank:write':'worker:write');if(typeDenied)return typeDenied;
     const sheet = book.Sheets[targetSheetName];
     if (!sheet) {
       return NextResponse.json({
@@ -140,20 +143,14 @@ export async function POST(request: NextRequest) {
           const idCard = String(cccdRaw).trim();
           const fullName = String(raw['Họ tên'] || raw['Họ và tên'] || '').trim();
           const company = String(raw['Công ty'] || raw['Nhà máy'] || '').trim();
-          const month = String(raw['Tháng'] || 'T01.2026').trim();
+          const month = sourceMonth(raw['Tháng'],String(raw['Ngày PV']||''));if(!month)throw new Error('Thiếu tháng thưởng');
           const interviewDate = String(raw['Ngày PV'] || '').trim();
           const policy = String(raw['Chính sách'] || '').trim();
           const workerCode = String(raw['Mã nhân viên'] || raw['Mã NV'] || '').trim();
           const stk = raw['STK'] ? String(raw['STK']).trim() : '';
           const bankName = raw['Ngân hàng'] ? String(raw['Ngân hàng']).trim() : '';
 
-          const parseBonus = (val: any) => {
-            if (!val) return 0;
-            const clean = String(val).replace(/[,.đ\s]/g, '');
-            const num = parseFloat(clean);
-            return isNaN(num) ? 0 : num;
-          };
-
+          const parseBonus = sourceRewardAmount;
           const bonus1 = parseBonus(raw['Thưởng lần 1']);
           const bonus2 = parseBonus(raw['Thưởng lần 2']);
           const bonus3 = parseBonus(raw['Thưởng lần 3']);
@@ -166,9 +163,11 @@ export async function POST(request: NextRequest) {
 
           let worker = workerMap.get(idCard);
 
-          if (!worker) {
-            warnings.push(`Dòng ${e.row}: CCCD ${idCard} chưa có hồ sơ nhân sự, hệ thống sẽ tự tạo hồ sơ liên kết thưởng.`);
-          }
+          if (!worker) throw new Error('CCCD chưa có hồ sơ; nhập DS_TONG trước');
+          if(typeof cccdRaw==='number')throw new Error('CCCD phải là Text');
+          const candidates=worker.assignments.filter(a=>(a.workingFactory||a.interviewFactory).toLowerCase()===company.toLowerCase()&&!!dateKey(interviewDate)&&dateKey(a.interviewDate||'')===dateKey(interviewDate)&&(!workerCode||a.employeeCode===workerCode||worker!.code===workerCode));
+          if(candidates.length!==1)throw new Error('Không xác định duy nhất đợt theo CCCD, công ty, ngày PV và mã NV');
+          const sourceNote=JSON.stringify({source:'SOURCE_EXCEL_ACTUAL_PAID',monthOriginal:raw['Tháng'],sourceValues:raw,rewards:Array.from({length:7},(_,i)=>String(raw['Thưởng lần '+(i+1)]||'')),paymentDate:null,reference:null});
 
           if (commit) {
             await prisma.$transaction(async tx => {
@@ -184,20 +183,16 @@ export async function POST(request: NextRequest) {
                 workerMap.set(idCard, worker);
               }
 
-              let assignmentId: string | undefined = undefined;
-              if (worker.assignments && worker.assignments.length > 0) {
-                const matched = worker.assignments.find((a: any) => a.interviewFactory?.toLowerCase() === company.toLowerCase());
-                assignmentId = matched ? matched.id : worker.assignments[0].id;
-              }
-
+              const assignmentId=candidates[0].id;
               const existingBonus = await tx.bonusRecord.findFirst({
                 where: {
                   workerId: worker.id,
                   month,
-                  company: company || undefined
+                  company: company || undefined, assignmentId
                 }
               });
 
+              if(existingBonus)throw new Error('Bản thưởng của đợt đã có; không tự ghi đè');
               if (existingBonus) {
                 await tx.bonusRecord.update({
                   where: { id: existingBonus.id },
@@ -213,7 +208,7 @@ export async function POST(request: NextRequest) {
                     bonus6,
                     bonus7,
                     totalBonus,
-                    status: 'APPROVED',
+                    status: 'DRAFT', note: sourceNote,
                     assignmentId: assignmentId || existingBonus.assignmentId
                   }
                 });
@@ -235,7 +230,7 @@ export async function POST(request: NextRequest) {
                     bonus6,
                     bonus7,
                     totalBonus,
-                    status: 'APPROVED'
+                    status: 'DRAFT', note: sourceNote
                   }
                 });
               }
@@ -251,8 +246,8 @@ export async function POST(request: NextRequest) {
                       accountNumber: stk,
                       accountHolderName: fullName || worker.fullName,
                       bankName: bankName || 'Ngân hàng đối soát',
-                      verificationStatus: 'VALID',
-                      isNameVerified: true,
+                      verificationStatus: 'UNVERIFIED',
+                      isNameVerified: false,
                       checkResult: 'Tự động tạo từ danh sách thưởng'
                     }
                   });
@@ -456,7 +451,7 @@ export async function POST(request: NextRequest) {
           warnings.push(`Dòng ${e.row}: nguồn xác nhận Đỗ, ngày đỗ dùng ngày PV; kiểm tra ở bước xem trước.`);
         }
         if (!assignment.interviewDate) throw new Error('Cần ngày PV để lưu đúng lượt tuyển và báo cáo');
-        if (!statuses.some(s => s.name === assignment.status)) throw new Error('Trạng thái chưa có trong danh mục: ' + assignment.status);
+        if (!statuses.some(s => s.name === assignment.status)&&!sourceStatuses.includes(assignment.status)) throw new Error('Trạng thái chưa có trong danh mục: ' + assignment.status);
         for (const k of ['orderId', 'batchId']) if (!assignment[k]) delete assignment[k];
         const old = people.get(worker.idCard);
         if (old?.archivedAt) throw new Error('Hồ sơ đã lưu trữ, khôi phục trước khi nhập đợt mới');
@@ -486,9 +481,12 @@ export async function POST(request: NextRequest) {
             continue;
           }
         }
-        await assignmentRelations(prisma, assignment);
+        const sourceStatus=sourceStatuses.includes(assignment.status)&&!statuses.some(s=>s.name===assignment.status);
+        if(sourceStatus)warnings.push(`Dòng ${e.row}: giữ nguyên mã tình trạng nguồn ${assignment.status}; chưa diễn giải.`);
+        if(!sourceStatus)await assignmentRelations(prisma, assignment);
         if (commit) {
           await prisma.$transaction(async tx => {
+            if(sourceStatus)await tx.laborStatus.upsert({where:{name:assignment.status},create:{name:assignment.status,category:'SOURCE',warnsDuplicate:false,endsAssignment:false},update:{}});
             let person = await tx.worker.findUnique({ where: { idCard: worker.idCard }, include: { assignments: true } });
             if (person?.assignments.some(a => identityKey(a) === identityKey(assignment))) throw new Error('Lượt PV đã được người khác thêm, tải lại dữ liệu');
             if (!person) person = await tx.worker.create({ data: { ...worker, fullName: worker.fullName, idCard: worker.idCard }, include: { assignments: true } });

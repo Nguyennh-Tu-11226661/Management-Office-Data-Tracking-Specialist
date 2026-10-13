@@ -244,6 +244,7 @@ export default function OverviewPage() {
       </Card>
 
       {/* 2. KHUNG CHỈ SỐ KPI VĨ MÔ */}
+      {data?.sourcePaid&&<Card title="Thưởng đã trả theo file Excel gốc"><Statistic title="Tiền đã trả — nguồn Excel" value={data.sourcePaid.total} suffix="₫"/><p className="text-slate-600 my-3">Theo xác nhận của chủ dữ liệu. Chưa có ngày chi/chứng từ; hiện vật giữ nguyên mô tả, không quy đổi thành tiền. Không cộng trùng với bảng mốc thưởng nội bộ.</p>{table(data.sourcePaid.rows,[{title:'Người lao động',dataIndex:'name'},{title:'Công ty',dataIndex:'company'},{title:'Tháng nguồn',dataIndex:'month'},{title:'Đã trả (₫)',dataIndex:'paid',render:money},{title:'Nội dung gốc từng mốc',dataIndex:'sourceRewards'}])}</Card>}
       {data && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">

@@ -24,6 +24,7 @@ export default function AuthGate({ children }: {
                 return;
             setUser(j.success ? j.data : null);
             setReady(true);
+            if(j.success&&j.data.localAutoView&&path==='/login')router.replace('/');
             if (!j.success && !publicPage)
                 router.replace('/login');
         }).catch(() => { if (active) {

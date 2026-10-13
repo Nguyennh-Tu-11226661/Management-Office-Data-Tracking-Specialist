@@ -36,7 +36,7 @@ export default function BonusesPage() {
     const [policies, setPolicies] = useState<any[]>([]);
     const [bonuses, setBonuses] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    const [selectedMonth, setSelectedMonth] = useState('T01.2026');
+    const [selectedMonth, setSelectedMonth] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [selectedCompany, setSelectedCompany] = useState('');
@@ -153,111 +153,22 @@ export default function BonusesPage() {
             message.error('Lỗi xuất lệnh chi');
         }
     };
+    const sourceInfo=(record:any)=>{try{const n=JSON.parse(record.note||'{}');return n.source==='SOURCE_EXCEL_ACTUAL_PAID'?n:null;}catch{return null;}};
     const columns = [
-        {
-            title: 'STT',
-            key: 'stt',
-            width: 50,
-            align: 'center' as const,
-            render: (_: any, __: any, index: number) => index + 1,
-        },
-        {
-            title: 'Công Ty / Nhà Máy',
-            dataIndex: 'company',
-            key: 'company',
-            render: (text: string) => <span className="font-semibold text-slate-700">{text || 'N/A'}</span>,
-        },
-        {
-            title: 'Tháng',
-            dataIndex: 'month',
-            key: 'month',
-            render: (text: string) => <Tag color="blue">{text}</Tag>,
-        },
-        {
-            title: 'Họ và Tên',
-            key: 'workerName',
-            render: (_: any, record: any) => (<div>
-          <div className="font-bold text-slate-900">{record.worker?.fullName}</div>
-          <div className="text-[11px] text-slate-500 font-mono">CCCD: {record.worker?.idCard}</div>
-        </div>),
-        },
-        {
-            title: 'Tài Khoản Nhận',
-            key: 'bank',
-            render: (_: any, record: any) => {
-                const bank = record.worker?.bankAccounts?.[0];
-                if (!bank)
-                    return <span className="text-xs text-rose-500 font-medium">Chưa có STK</span>;
-                return (<div className="text-xs">
-            <span className="font-mono font-bold text-slate-800">{bank.accountNumber}</span>
-            <div className="text-[10px] text-slate-500">{bank.bankName} - {bank.accountHolderName}</div>
-          </div>);
-            },
-        },
-        {
-            title: 'Thưởng 1 (3c)',
-            dataIndex: 'bonus1',
-            key: 'bonus1',
-            align: 'right' as const,
-            render: (v: number) => <span>{(v || 0).toLocaleString()} đ</span>,
-        },
-        {
-            title: 'Thưởng 2 (7c)',
-            dataIndex: 'bonus2',
-            key: 'bonus2',
-            align: 'right' as const,
-            render: (v: number) => <span>{(v || 0).toLocaleString()} đ</span>,
-        },
-        {
-            title: 'Thưởng 3 (15c)',
-            dataIndex: 'bonus3',
-            key: 'bonus3',
-            align: 'right' as const,
-            render: (v: number) => <span>{(v || 0).toLocaleString()} đ</span>,
-        },
-        {
-            title: 'Thưởng 4 (30c)',
-            dataIndex: 'bonus4',
-            key: 'bonus4',
-            align: 'right' as const,
-            render: (v: number) => <span>{(v || 0).toLocaleString()} đ</span>,
-        },
-        {
-            title: 'Tổng Thưởng',
-            dataIndex: 'totalBonus',
-            key: 'totalBonus',
-            align: 'right' as const,
-            render: (v: number) => (<span className="font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-          {(v || 0).toLocaleString('vi-VN')} đ
-        </span>),
-        },
-        {
-            title: 'Trạng Thái',
-            dataIndex: 'status',
-            key: 'status',
-            render: (status: string) => {
-                if (status === 'APPROVED')
-                    return <Tag color="success">Đã Duyệt</Tag>;
-                if (status === 'LOCKED')
-                    return <Tag color="purple">Đã Khóa Sổ</Tag>;
-                if (status === 'REVIEWED')
-                    return <Tag color="blue">Đã rà soát (cũ)</Tag>;
-                return <Tag color="warning">Dự Thảo</Tag>;
-            },
-        },
-        {
-            title: 'Thao Tác',
-            key: 'actions',
-            render: (_: any, record: any) => (<Space size="small">
-          {canWrite && record.status === 'DRAFT' && <Button size="small" onClick={() => { setEditing(record); addForm.resetFields(); addForm.setFieldsValue({ ...record, bonus1: record.bonus1 ?? 0, bonus2: record.bonus2 ?? 0, bonus3: record.bonus3 ?? 0, bonus4: record.bonus4 ?? 0, bonus5: record.bonus5 ?? 0, bonus6: record.bonus6 ?? 0, bonus7: record.bonus7 ?? 0, policy: record.policy || '' }); setIsAddModalOpen(true); }}>Sửa dự thảo</Button>}
-          {canApprove && ['DRAFT', 'REVIEWED'].includes(record.status) && (<Button size="small" type="primary" icon={<CheckCircle className="w-3.5 h-3.5"/>} onClick={() => handleApprove(record.id, 'APPROVED')}>
-              Duyệt
-            </Button>)}
-          {canApprove && record.status === 'APPROVED' && (<Button size="small" type="dashed" icon={<Lock className="w-3.5 h-3.5"/>} onClick={() => handleApprove(record.id, 'LOCKED')}>
-              Khóa
-            </Button>)}
-        </Space>),
-        },
+      {title:'STT',key:'stt',width:65,render:(_:any,r:any,i:number)=>sourceInfo(r)?.sourceValues?.STT||((currentPage-1)*pageSize+i+1)},
+      {title:'Công ty',dataIndex:'company',width:160},
+      {title:'Tháng',dataIndex:'month',width:130,render:(v:string,r:any)=>sourceInfo(r)?.monthOriginal||v},
+      {title:'Ngày PV',dataIndex:'interviewDate',width:130},
+      {title:'Chính sách',dataIndex:'policy',width:280},
+      {title:'Mã nhân viên',dataIndex:'workerCode',width:150},
+      {title:'Họ tên',key:'name',width:190,render:(_:any,r:any)=>r.worker?.fullName},
+      {title:'Số CCCD',key:'idCard',width:160,render:(_:any,r:any)=>r.worker?.idCard},
+      {title:'STK',key:'account',width:180,render:(_:any,r:any)=>{const n=sourceInfo(r);return n?.sourceValues?.STK??(r.worker?.bankAccounts?.length===1?r.worker.bankAccounts[0].accountNumber:'Chưa xác định');}},
+      {title:'Ngân hàng',key:'bank',width:170,render:(_:any,r:any)=>{const n=sourceInfo(r);return n?.sourceValues?.['Ngân hàng']??(r.worker?.bankAccounts?.length===1?r.worker.bankAccounts[0].bankName:'Chưa xác định');}},
+      ...Array.from({length:7},(_,i)=>({title:`Thưởng lần ${i+1}`,key:`bonus${i+1}`,width:230,render:(_:any,r:any)=>{const n=sourceInfo(r);return n?<span className="whitespace-pre-wrap">{n.rewards?.[i]||'—'}</span>:<span>{Number(r[`bonus${i+1}`]||0).toLocaleString('vi-VN')} đ</span>;}})),
+      {title:'Tổng tiền (₫)',dataIndex:'totalBonus',width:170,render:(v:number)=><strong className="text-emerald-700">{Number(v||0).toLocaleString('vi-VN')}</strong>},
+      {title:'Nguồn / trạng thái',key:'status',width:220,render:(_:any,r:any)=>sourceInfo(r)?<><Tag color="blue">Đã trả theo Excel</Tag><div className="text-xs text-slate-600">Chưa có ngày chi/chứng từ</div></>:<Tag>{r.status==='APPROVED'?'Đã duyệt':r.status==='LOCKED'?'Đã khóa':'Dự thảo nội bộ'}</Tag>},
+      {title:'Thao tác',key:'actions',width:220,render:(_:any,r:any)=>sourceInfo(r)?<span className="text-slate-600">Đối chiếu file gốc</span>:<Space>{canWrite&&r.status==='DRAFT'&&<Button size="small" onClick={()=>{setEditing(r);addForm.resetFields();addForm.setFieldsValue({...r});setIsAddModalOpen(true);}}>Sửa dự thảo</Button>}{canApprove&&['DRAFT','REVIEWED'].includes(r.status)&&<Button size="small" onClick={()=>handleApprove(r.id,'APPROVED')}>Duyệt</Button>}{canApprove&&r.status==='APPROVED'&&<Button size="small" onClick={()=>handleApprove(r.id,'LOCKED')}>Khóa</Button>}</Space>},
     ];
     const totalMonthAmount = bonuses.reduce((sum, b) => sum + (b.totalBonus || 0), 0);
     return (<div className="space-y-6">
@@ -268,12 +179,12 @@ export default function BonusesPage() {
             Quản Lý Tiền Thưởng & Định Mức Công (`DS_THUONG`)
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Ghi nhận 7 khoản thưởng theo chính sách đã xác nhận; chưa tự tính từ ngày công. Duyệt và khóa sổ không xác nhận tiền đã chuyển.
+            Hiển thị các cột theo Thưởng.xlsx và nguyên nội dung Thưởng lần 1–7. Các khoản nguồn Excel là đã trả theo xác nhận của chủ dữ liệu; hiện vật không quy đổi ra tiền. Trạng thái duyệt nội bộ được tách riêng.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <span>
-            <Button type="primary" onClick={handleExport} className="bg-emerald-600 hover:bg-emerald-500" icon={<Download className="w-4 h-4"/>}>
+            <Button type="primary" onClick={handleExport} disabled={!selectedMonth} className="bg-emerald-600 hover:bg-emerald-500" icon={<Download className="w-4 h-4"/>}>
               Xuất File Chi Ngân Hàng ({selectedMonth})
             </Button>
           </span>
@@ -292,7 +203,7 @@ export default function BonusesPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="text-xs font-bold text-slate-700">Chọn Kỳ Tháng:</span>
-            <Select value={selectedMonth} onChange={setSelectedMonth} className="w-36" options={MONTHS.map((m) => ({ label: m, value: m }))}/>
+            <Select value={selectedMonth} onChange={setSelectedMonth} className="w-36" options={[{label:'Tất cả tháng',value:''},...MONTHS.map((m) => ({ label: m, value: m }))]}/>
             <Select placeholder="Tất cả Nhà máy" allowClear value={selectedCompany || undefined} onChange={(v) => setSelectedCompany(v || '')} className="w-48" options={FACTORIES.map((f) => ({ label: f, value: f }))}/>
           </div>
 
@@ -300,7 +211,7 @@ export default function BonusesPage() {
             <Coins className="w-5 h-5 text-amber-600"/>
             <div>
               <div className="text-[11px] text-amber-700 font-semibold uppercase">
-                Tổng Tiền Thưởng Kỳ {selectedMonth}
+                Tổng số tiền trong danh sách {selectedMonth||'tất cả tháng'}
               </div>
               <div className="text-lg font-black text-amber-800">
                 {totalMonthAmount.toLocaleString('vi-VN')} VNĐ
@@ -328,6 +239,7 @@ export default function BonusesPage() {
             },
             showTotal: (total, range) => `${range[0]} - ${range[1]} / ${total} bản ghi`,
           }}
+          scroll={{x:4300}}
           bordered
           size="middle"
         />
@@ -349,26 +261,26 @@ export default function BonusesPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <Form.Item name="month" label="Kỳ Tháng">
-              <Select disabled={!!editing} options={MONTHS.map((m) => ({ label: m, value: m }))}/>
+              <Select disabled={!!editing} options={[{label:'Tất cả tháng',value:''},...MONTHS.map((m) => ({ label: m, value: m }))]}/>
             </Form.Item>
 
             <Form.Item name="company" label="Nhà Máy / Công Ty">
               <Select disabled={!!editing} options={FACTORIES.map((f) => ({ label: f, value: f }))}/>
             </Form.Item>
 
-            <Form.Item name="bonus1" label="Thưởng Lần 1 (3 công)">
+            <Form.Item name="bonus1" label="Thưởng Lần 1">
               <InputNumber className="w-full" min={0} precision={0} step={50000}/>
             </Form.Item>
 
-            <Form.Item name="bonus2" label="Thưởng Lần 2 (7 công)">
+            <Form.Item name="bonus2" label="Thưởng Lần 2">
               <InputNumber className="w-full" min={0} precision={0} step={50000}/>
             </Form.Item>
 
-            <Form.Item name="bonus3" label="Thưởng Lần 3 (15 công - tiền xe)">
+            <Form.Item name="bonus3" label="Thưởng Lần 3">
               <InputNumber className="w-full" min={0} precision={0} step={50000}/>
             </Form.Item>
 
-            <Form.Item name="bonus4" label="Thưởng Lần 4 (30 công)">
+            <Form.Item name="bonus4" label="Thưởng Lần 4">
               <InputNumber className="w-full" min={0} precision={0} step={50000}/>
             </Form.Item>
             {[5, 6, 7].map(n => <Form.Item key={n} name={`bonus${n}`} label={`Thưởng lần ${n}`}><InputNumber className="w-full" min={0} precision={0} step={50000}/></Form.Item>)}
