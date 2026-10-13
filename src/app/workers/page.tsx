@@ -1,4 +1,5 @@
 'use client';
+import {workerSourceColumns} from '@/lib/worker-source-view';
 import AssignmentFields from '@/components/AssignmentFields';
 import {STATUSES} from '@/lib/worker-validation';
 import { useIdentity } from '@/components/AuthGate';
@@ -32,6 +33,12 @@ export default function WorkersPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [statusFilter, setStatusFilter] = useState('');
+    const [sourceOptions,setSourceOptions]=useState<Record<string,string[]>>({});
+    const [sourceMonth,setSourceMonth]=useState(''),[recruiterFilter,setRecruiterFilter]=useState(''),[columnFilter,setColumnFilter]=useState(''),[columnValue,setColumnValue]=useState('');
+    const [warningsOnly,setWarningsOnly]=useState(false);
+    const [pendingDuplicateCount,setPendingDuplicateCount]=useState(0);
+    const [unlinkedBonusRows,setUnlinkedBonusRows]=useState<any[]>([]);
+    const [sourceTotals,setSourceTotals]=useState({totalRows:0,sourceRows:0,warningRows:0});
     // Modal thêm mới
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [addForm] = Form.useForm();
@@ -43,17 +50,17 @@ export default function WorkersPage() {
     const fetchWorkers = async () => {
         try {
             setLoading(true);
-            const params = new URLSearchParams({archived:String(archived),month});
+            const params = new URLSearchParams({archived:String(archived),month,sourceMonth,recruiter:recruiterFilter,column:columnFilter,columnValue,...(warningsOnly?{warningsOnly:'true'}:{})});
             if (search)
                 params.append('search', search);
             if (factoryFilter)
                 params.append('factory', factoryFilter);
             if (statusFilter)
                 params.append('status', statusFilter);
-            const res = await fetch(`/api/workers?${params.toString()}`);
+            const res = await fetch(`/api/worker-source-rows?${params.toString()}`);
             const json = await res.json();
             if (json.success) {
-                setWorkers(json.data);
+                setWorkers(json.data);setSourceOptions(json.options||{});setUnlinkedBonusRows(json.unlinkedBonusRows||[]);setPendingDuplicateCount(json.pendingDuplicateCount||0);setSourceTotals({totalRows:json.totalRows,sourceRows:json.sourceRows,warningRows:json.warningRows});
             }
         }
         catch (err) {
@@ -66,7 +73,7 @@ export default function WorkersPage() {
     useEffect(() => {
         setCurrentPage(1);
         fetchWorkers();
-    }, [factoryFilter, statusFilter,archived,month]);
+    }, [factoryFilter, statusFilter,archived,month,sourceMonth,recruiterFilter,warningsOnly]);
     const handleSearch = () => {
         setCurrentPage(1);
         fetchWorkers();
@@ -179,230 +186,9 @@ export default function WorkersPage() {
     };
 
     const columns = [
-        {
-            title: 'STT',
-            key: 'stt',
-            width: 55,
-            fixed: 'left' as const,
-            align: 'center' as const,
-            render: (_: any, __: any, index: number) => (currentPage - 1) * pageSize + index + 1,
-        },
-        {
-            title: 'Nhà Máy PV',
-            key: 'interviewFactory',
-            width: 140,
-            render: (_: any, record: any) => {
-                const a = record.assignments[0];
-                return (
-                    <span className="font-semibold text-slate-800 flex items-center gap-1.5 text-xs">
-                        <Building className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                        {a?.interviewFactory || '—'}
-                    </span>
-                );
-            },
-        },
-        {
-            title: 'Nhà Máy Làm Việc',
-            key: 'workingFactory',
-            width: 140,
-            render: (_: any, record: any) => {
-                const a = record.assignments[0];
-                return <span className="text-xs text-slate-700">{a?.workingFactory || a?.interviewFactory || '—'}</span>;
-            },
-        },
-        {
-            title: 'Loại HĐ',
-            key: 'contractType',
-            width: 100,
-            render: (_: any, record: any) => {
-                const a = record.assignments[0];
-                return <Tag color="blue" className="text-xs">{a?.contractType || 'Thời vụ'}</Tag>;
-            },
-        },
-        {
-            title: 'Tình Trạng (Còn LV / Nghỉ)',
-            key: 'status',
-            width: 140,
-            render: (_: any, record: any) => {
-                const a = record.assignments[0];
-                const status = a?.status || 'Chưa rõ';
-                if (status === 'Đang làm việc') return <Tag color="success">Còn LV</Tag>;
-                if (status === 'Đã nghỉ việc') return <Tag color="error">Đã nghỉ việc</Tag>;
-                if (status === 'Đạt phỏng vấn') return <Tag color="processing">Đạt PV</Tag>;
-                return <Tag color="default">{status}</Tag>;
-            },
-        },
-        {
-            title: 'Ngày NH (Nghỉ việc)',
-            key: 'leaveDate',
-            width: 120,
-            render: (_: any, record: any) => {
-                const a = record.assignments[0];
-                return a?.leaveDate ? <span className="text-xs font-semibold text-rose-600">{a.leaveDate}</span> : <span className="text-slate-400">—</span>;
-            },
-        },
-        {
-            title: 'Lý Do Nghỉ',
-            key: 'leaveReason',
-            width: 150,
-            render: (_: any, record: any) => {
-                const a = record.assignments[0];
-                return <span className="text-xs text-slate-600">{a?.leaveReason || '—'}</span>;
-            },
-        },
-        {
-            title: 'Mã NV',
-            key: 'code',
-            width: 90,
-            render: (_: any, record: any) => <span className="font-mono text-xs text-slate-700">{record.code || record.assignments[0]?.employeeCode || '—'}</span>,
-        },
-        {
-            title: 'Họ và Tên',
-            dataIndex: 'fullName',
-            key: 'fullName',
-            width: 180,
-            fixed: 'left' as const,
-            render: (text: string, record: any) => (
-                <div>
-                    <span className="font-bold text-slate-900">{text}</span>
-                    <div className="text-[11px] text-slate-500">
-                        {record.gender || '—'} · {record.dob || '—'}
-                    </div>
-                </div>
-            ),
-        },
-        {
-            title: 'Ngày Sinh',
-            dataIndex: 'dob',
-            key: 'dob',
-            width: 100,
-            render: (text: string) => <span className="text-xs text-slate-600">{text || '—'}</span>,
-        },
-        {
-            title: 'Giới Tính',
-            dataIndex: 'gender',
-            key: 'gender',
-            width: 80,
-            render: (text: string) => <span className="text-xs text-slate-600">{text || '—'}</span>,
-        },
-        {
-            title: 'Số CCCD',
-            dataIndex: 'idCard',
-            key: 'idCard',
-            width: 130,
-            render: (text: string) => (
-                <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                    {text}
-                </span>
-            ),
-        },
-        {
-            title: 'Ngày Cấp CCCD',
-            dataIndex: 'idCardDate',
-            key: 'idCardDate',
-            width: 110,
-            render: (text: string) => <span className="text-xs text-slate-600">{text || '—'}</span>,
-        },
-        {
-            title: 'Địa Chỉ / Quê Quán',
-            key: 'address',
-            width: 150,
-            render: (_: any, record: any) => <span className="text-xs text-slate-600">{record.province || record.address || '—'}</span>,
-        },
-        {
-            title: 'Số Điện Thoại',
-            dataIndex: 'phone',
-            key: 'phone',
-            width: 120,
-            render: (text: string) => <span className="text-xs font-medium text-slate-700">{text || '—'}</span>,
-        },
-        {
-            title: 'Tuyển Dụng',
-            key: 'recruiter',
-            width: 140,
-            render: (_: any, record: any) => {
-                const a = record.assignments[0];
-                return <span className="text-xs font-semibold text-slate-700">{a?.recruiter || record.recruiter || '—'}</span>;
-            },
-        },
-        {
-            title: 'Đón Xe - KTX',
-            key: 'shuttleBusKtx',
-            width: 120,
-            render: (_: any, record: any) => {
-                const a = record.assignments[0];
-                return <span className="text-xs text-slate-600">{a?.shuttleBusKtx || '—'}</span>;
-            },
-        },
-        {
-            title: 'Ngày PV',
-            key: 'interviewDate',
-            width: 110,
-            render: (_: any, record: any) => {
-                const a = record.assignments[0];
-                return <span className="text-xs text-slate-700">{a?.interviewDate || '—'}</span>;
-            },
-        },
-        {
-            title: 'Ngày Đào Tạo Dự Kiến',
-            key: 'expectedTrainingDate',
-            width: 140,
-            render: (_: any, record: any) => {
-                const a = record.assignments[0];
-                return <span className="text-xs text-slate-600">{a?.expectedTrainingDate || '—'}</span>;
-            },
-        },
-        {
-            title: 'Tình Trạng ĐT Dự Kiến',
-            key: 'expectedTrainingStatus',
-            width: 140,
-            render: (_: any, record: any) => {
-                const a = record.assignments[0];
-                return <span className="text-xs text-slate-600">{a?.expectedTrainingStatus || '—'}</span>;
-            },
-        },
-        {
-            title: 'Ngày Đào Tạo Chuẩn',
-            key: 'standardTrainingDate',
-            width: 130,
-            render: (_: any, record: any) => {
-                const a = record.assignments[0];
-                return <span className="text-xs text-slate-600">{a?.standardTrainingDate || '—'}</span>;
-            },
-        },
-        {
-            title: 'Tháng Nhận Việc',
-            key: 'onboardingMonth',
-            width: 120,
-            render: (_: any, record: any) => {
-                const a = record.assignments[0];
-                return <span className="text-xs font-semibold text-slate-700">{a?.onboardingMonth || '—'}</span>;
-            },
-        },
-        {
-            title: 'Nguồn',
-            key: 'source',
-            width: 110,
-            render: (_: any, record: any) => {
-                const a = record.assignments[0];
-                return <span className="text-xs text-slate-500">{a?.source || record.source || '—'}</span>;
-            },
-        },
-        {
-            title: 'Thao Tác',
-            key: 'actions',
-            width: 270,
-            fixed: 'right' as const,
-            render: (_: any, record: any) => (<Space size="small">
-          <Button size="small" type="text" icon={<Edit3 className="w-3.5 h-3.5 text-blue-600"/>} disabled={!canWrite} onClick={() => handleOpenStatusModal(record)} title="Đổi trạng thái / Báo nghỉ việc"/>
-          <Button size="small" onClick={() => handleOpenHistory(record)} title="Xem toàn bộ lịch sử các công ty đã làm việc" className="text-blue-600 font-medium">
-            Lịch sử ({record.assignments?.length || 1})
-          </Button>
-          <a href={`/workers/${record.id}`} className="text-xs text-slate-600 hover:text-blue-600 font-medium">Chi tiết</a>
-          <Button size="small" disabled={!canWrite} onClick={async()=>{if(!window.confirm(archived?'Khôi phục hồ sơ này?':'Lưu trữ hồ sơ này và giữ toàn bộ lịch sử?'))return;const j=await (await fetch(`/api/workers/${record.id}`,{method:archived?'PATCH':'DELETE'})).json();if(j.success)fetchWorkers();else message.error(j.message);}}>{archived?'Khôi phục':'Lưu trữ'}</Button>
-          {!['Đang làm việc','Chưa đào tạo'].includes(record.assignments?.[0]?.status) && <Button size="small" disabled={!canWrite} onClick={() => { setRehire(true); addForm.resetFields(); addForm.setFieldsValue({ ...record, status: 'Đang chờ phỏng vấn', interviewFactory: record.assignments[0]?.interviewFactory, workingFactory: '', onboardingMonth: '', interviewDate: '', standardTrainingDate: '' }); setIsAddModalOpen(true); }}>Tái tuyển</Button>}
-        </Space>),
-        },
+      ...workerSourceColumns.map(column=>({title:column,key:column,width:column==='Địa chỉ'?260:column==='Họ và tên'?190:150,render:(_:any,record:any,index:number)=>column==='STT'?String(record.sourceValues?.STT??((currentPage-1)*pageSize+index+1)):<span className="whitespace-pre-wrap">{String(record.sourceValues?.[column]??'')||'—'}</span>})),
+      {title:'Cảnh báo dữ liệu / nguồn',key:'warnings',width:280,render:(_:any,r:any)=><div><Tag color={r.sourceWarnings?.length?'warning':'blue'}>{r.sourceWarnings?.length?'Cần kiểm tra':'Dữ liệu nguồn'}</Tag>{!!r.sourceDuplicates?.length&&<a href="/import-review?type=duplicates"><Tag color="red">Trùng lặp — xem luồng riêng</Tag></a>}<p className="text-xs text-slate-600">{r.sourceFile}{r.sourceRow?` · dòng ${r.sourceRow}`:''}</p>{(r.sourceWarnings||[]).map((w:string,i:number)=><p key={i} className="text-xs text-amber-800">{w}</p>)}</div>},
+      {title:'Hồ sơ / lịch sử',key:'actions',width:200,render:(_:any,r:any)=>r.workerId?<a href={`/workers/${r.workerId}`} className="text-blue-600">Xem hồ sơ và thưởng theo đợt</a>:<span className="text-amber-800">Chưa liên kết hồ sơ; vẫn giữ dòng nguồn</span>},
     ];
     return (<div className="space-y-6">
       {/* Title & Actions */}
@@ -412,7 +198,7 @@ export default function WorkersPage() {
             Hồ Sơ Lao Động Master Data (`DS_TONG`)
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Quản lý vòng đời nhân sự, chống trùng lặp CCCD/SĐT và phân loại Còn LV vs Đã nghỉ việc
+            Đối chiếu đủ 22 cột Excel, xem từng dòng nguồn và từng lượt tuyển. Dữ liệu chưa hợp lệ giữ nguyên kèm cảnh báo.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -432,14 +218,18 @@ export default function WorkersPage() {
 
       {/* Filter Bar */}
       <Card className="shadow-sm border-slate-200">
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-          <Input placeholder="Tìm theo Họ tên, CCCD, SĐT, Tuyển dụng..." prefix={<Search className="w-4 h-4 text-slate-400"/>} value={search} onChange={(e) => setSearch(e.target.value)} onPressEnter={handleSearch} allowClear/>
-          <Select placeholder="Lọc theo Nhà máy phỏng vấn" allowClear value={factoryFilter || undefined} onChange={(val) => setFactoryFilter(val || '')} options={FACTORIES.map((f) => ({ label: f, value: f }))}/>
-          <Select placeholder="Lọc theo Tình trạng" allowClear value={statusFilter || undefined} onChange={(val) => setStatusFilter(val || '')} options={STATUSES.map(value=>({value,label:value}))}/>
-          <Button type="default" onClick={handleSearch} icon={<Filter className="w-4 h-4"/>}>
-            Áp Dụng Bộ Lọc
-          </Button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div><label className="block font-medium mb-2">Tìm trong toàn bộ cột</label><Input placeholder="Tên, CCCD, mã NV, SĐT, nội dung nguồn..." value={search} onChange={e=>setSearch(e.target.value)} onPressEnter={handleSearch} allowClear/></div>
+          <div><label className="block font-medium mb-2">Nhà máy phỏng vấn</label><Select className="w-full" allowClear value={factoryFilter||undefined} onChange={v=>setFactoryFilter(v||'')} options={(sourceOptions['Nhà máy PV']||[]).map(value=>({value,label:value}))}/></div>
+          <div><label className="block font-medium mb-2">Tình trạng trong Excel</label><Select className="w-full" allowClear value={statusFilter||undefined} onChange={v=>setStatusFilter(v||'')} options={(sourceOptions['Tình trạng']||[]).map(value=>({value,label:value}))}/></div>
+          <div><label className="block font-medium mb-2">Tháng nhận việc trong Excel</label><Select className="w-full" allowClear value={sourceMonth||undefined} onChange={v=>setSourceMonth(v||'')} options={(sourceOptions['Tháng nhận việc']||[]).map(value=>({value,label:value}))}/></div>
+          <div><label className="block font-medium mb-2">Tuyển dụng</label><Select className="w-full" allowClear value={recruiterFilter||undefined} onChange={v=>setRecruiterFilter(v||'')} options={(sourceOptions['Tuyển dụng']||[]).map(value=>({value,label:value}))}/></div>
+          <div><label className="block font-medium mb-2">Lọc theo cột bất kỳ</label><Select className="w-full" allowClear value={columnFilter||undefined} onChange={v=>setColumnFilter(v||'')} options={workerSourceColumns.map(value=>({value,label:value}))}/></div>
+          <div><label className="block font-medium mb-2">Giá trị chứa</label><Input value={columnValue} onChange={e=>setColumnValue(e.target.value)} onPressEnter={handleSearch} placeholder="Nhập nội dung cần lọc"/></div>
+          <div className="flex flex-wrap gap-2 items-end"><Button onClick={handleSearch} icon={<Filter className="w-4 h-4"/>}>Áp dụng bộ lọc</Button><Button onClick={()=>setWarningsOnly(!warningsOnly)} type={warningsOnly?'primary':'default'}>Chỉ dòng cảnh báo</Button></div>
         </div>
+        <div className="flex flex-wrap gap-3 mt-4"><a className="text-amber-800" href="/import-review?type=warnings">Xem luồng cảnh báo</a><a className="text-rose-700" href="/import-review?type=duplicates">Danh sách trùng chờ kiểm tra ({pendingDuplicateCount})</a></div>
+        <p className="text-sm text-slate-600 mt-4">{workers.length.toLocaleString('vi-VN')} dòng đang hiển thị / {sourceTotals.totalRows.toLocaleString('vi-VN')} dòng; {sourceTotals.sourceRows.toLocaleString('vi-VN')} dòng nguồn Excel, {sourceTotals.warningRows.toLocaleString('vi-VN')} dòng cảnh báo. Dòng cảnh báo vẫn hiển thị; dòng trùng nằm ở danh sách kiểm tra riêng.</p>
       </Card>
 
       {/* Data Table */}
@@ -477,8 +267,9 @@ export default function WorkersPage() {
           columns={columns}
           dataSource={workers}
           rowKey="id"
+          expandable={{expandedRowRender:(r:any)=><div className="p-3"><h3 className="font-semibold mb-2">Nội dung Thưởng.xlsx cùng CCCD · công ty · ngày PV</h3><p className="text-sm text-slate-600 mb-3">Giữ nguyên các ô nguồn; đây là đối chiếu dữ liệu, không tự xác minh điều kiện hay chứng từ chi trả.</p><Table<any> rowKey="id" pagination={false} size="small" scroll={{x:3200}} dataSource={r.rewardSource||[]} columns={['Công ty','Tháng','Ngày PV','Chính sách','Mã nhân viên','Họ tên','Số CCCD','STK','Ngân hàng',...Array.from({length:7},(_,i)=>`Thưởng lần ${i+1}`)].map(name=>({title:name,key:name,width:190,render:(_:any,b:any)=>String(b.values?.[name]??'')||'—'}))}/></div>}}
           loading={loading}
-          scroll={{ x: 2800 }}
+          scroll={{ x: 4200 }}
           pagination={{
             current: currentPage,
             pageSize: pageSize,
@@ -488,13 +279,14 @@ export default function WorkersPage() {
               setCurrentPage(page);
               setPageSize(size);
             },
-            showTotal: (total, range) => `${range[0]} - ${range[1]} / ${total} hồ sơ`,
+            showTotal: (total, range) => `${range[0]} - ${range[1]} / ${total} dòng nguồn / lượt tuyển`,
           }}
           bordered
           size="middle"
         />
       </Card>
 
+      {!!unlinkedBonusRows.length&&<Card title={`Thưởng nguồn chưa liên kết hồ sơ (${unlinkedBonusRows.length} dòng)`}><p className="text-amber-800 mb-3">Các dòng này vẫn được giữ. Cần đối chiếu CCCD, công ty và ngày PV; không tự ghép sang hồ sơ khác.</p><Table<any> rowKey="id" dataSource={unlinkedBonusRows} pagination={{pageSize:10}} scroll={{x:3200}} columns={['Công ty','Tháng','Ngày PV','Chính sách','Mã nhân viên','Họ tên','Số CCCD','STK','Ngân hàng',...Array.from({length:7},(_,i)=>`Thưởng lần ${i+1}`)].map(name=>({title:name,key:name,width:190,render:(_:any,b:any)=>String(b.values?.[name]??'')||'—'}))}/></Card>}
       <Modal
         title={
           <div className="flex items-center justify-between pr-8">

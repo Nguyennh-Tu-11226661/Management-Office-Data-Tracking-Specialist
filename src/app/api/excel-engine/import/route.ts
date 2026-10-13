@@ -1,3 +1,5 @@
+import {splitImportReview} from '@/lib/import-review';
+import {saveImportSource} from '@/lib/import-source-store';
 import {sourceMonth,sourceRewardAmount,sourceStatuses} from '@/lib/source-format';
 import {dateKey} from '@/lib/worker-validation';
 import { NextRequest, NextResponse } from 'next/server';
@@ -273,15 +275,18 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      const review=splitImportReview([...warnings,...errors]);
+    const sourceId=commit?await saveImportSource(detectedType,file.name,targetSheetName,entries,warnings,errors):null;
       return NextResponse.json({
+        review, sourceId, normalizedSaved:successCount, sourceRowsSaved:commit?entries.length:0,mainSourceRows:entries.length-review.duplicateRows,pendingDuplicateCount:review.duplicateRows,
         success: true,
         preview: !commit,
         detectedType: 'DS_THUONG',
         detectedTypeName: 'Bảng thưởng các lần 1 → 7 (DS_THUONG)',
         sheetUsed: targetSheetName,
-        summary: { totalRows: entries.length, successCount, readyCount, duplicateCount, errorCount, rehireCount },
-        errors,
-        warnings
+        summary: { totalRows: entries.length, successCount:commit?entries.length:0, readyCount:commit?0:entries.length, duplicateCount:review.duplicateRows, errorCount:0, warningCount:review.warningRows, cleanCount:entries.length-review.reviewRows, rehireCount }, normalizationErrors:errors,
+        errors:[],
+        warnings:review.warnings.map(i=>i.message), duplicates:review.duplicates.map(i=>i.message)
       });
     }
 
@@ -317,6 +322,7 @@ export async function POST(request: NextRequest) {
             warnings.push(`Dòng ${e.row}: CCCD ${idCard} chưa có trong hồ sơ, hệ thống sẽ tự động tạo hồ sơ cơ bản.`);
           }
 
+          if(worker?.bankAccounts.some(a=>a.accountNumber===accountNumber))throw new Error('STK trùng hồ sơ đã có — giữ riêng chờ kiểm tra');
           if (commit) {
             await prisma.$transaction(async tx => {
               if (!worker) {
@@ -339,6 +345,7 @@ export async function POST(request: NextRequest) {
                 }
               });
 
+              if(existingBank)throw new Error('STK trùng hồ sơ đã có — giữ riêng chờ kiểm tra');
               if (existingBank) {
                 await tx.bankAccount.update({
                   where: { id: existingBank.id },
@@ -389,15 +396,18 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      const review=splitImportReview([...warnings,...errors]);
+    const sourceId=commit?await saveImportSource(detectedType,file.name,targetSheetName,entries,warnings,errors):null;
       return NextResponse.json({
+        review, sourceId, normalizedSaved:successCount, sourceRowsSaved:commit?entries.length:0,mainSourceRows:entries.length-review.duplicateRows,pendingDuplicateCount:review.duplicateRows,
         success: true,
         preview: !commit,
         detectedType: 'BANK_ACCOUNTS',
         detectedTypeName: 'Đối soát số tài khoản ngân hàng (STK)',
         sheetUsed: targetSheetName,
-        summary: { totalRows: entries.length, successCount, readyCount, duplicateCount, errorCount, rehireCount },
-        errors,
-        warnings
+        summary: { totalRows: entries.length, successCount:commit?entries.length:0, readyCount:commit?0:entries.length, duplicateCount:review.duplicateRows, errorCount:0, warningCount:review.warningRows, cleanCount:entries.length-review.reviewRows, rehireCount }, normalizationErrors:errors,
+        errors:[],
+        warnings:review.warnings.map(i=>i.message), duplicates:review.duplicates.map(i=>i.message)
       });
     }
 
@@ -446,11 +456,12 @@ export async function POST(request: NextRequest) {
             if (labels[field]) raw[labels[field]] = e.raw[String(column).trim()];
           }
         }
-        const { worker, assignment } = parseImportRow(raw);
+        const { worker, assignment } = parseImportRow(raw,true);
         if (assignment.interviewResult === 'PASS' && !raw['Ngày đỗ'] && !raw['Ngày PV đỗ']) {
           warnings.push(`Dòng ${e.row}: nguồn xác nhận Đỗ, ngày đỗ dùng ngày PV; kiểm tra ở bước xem trước.`);
         }
-        if (!assignment.interviewDate) throw new Error('Cần ngày PV để lưu đúng lượt tuyển và báo cáo');
+        const rowWarnings:string[]=[];try{parseImportRow(raw);}catch(issue:any){rowWarnings.push(issue.message);warnings.push(`Dòng ${e.row}: giữ thông tin nguồn, cần kiểm tra: ${issue.message}`);}
+        if (!assignment.interviewDate||!dateKey(assignment.interviewDate)) throw new Error('Cần ngày PV để lưu đúng lượt tuyển và báo cáo');
         if (!statuses.some(s => s.name === assignment.status)&&!sourceStatuses.includes(assignment.status)) throw new Error('Trạng thái chưa có trong danh mục: ' + assignment.status);
         for (const k of ['orderId', 'batchId']) if (!assignment[k]) delete assignment[k];
         const old = people.get(worker.idCard);
@@ -466,18 +477,18 @@ export async function POST(request: NextRequest) {
         const activeDuplicate = old?.assignments.some(a => warns.has(a.status));
         if (activeDuplicate) {
           warnings.push(`Dòng ${e.row}: CCCD có đợt Đang làm việc/Chưa đào tạo; xem lịch sử trước khi thêm lượt.`);
-          if (commit && !confirmActive) {
+          if (commit) {
             errorCount++;
-            errors.push(`Dòng ${e.row}: chưa xác nhận hồ sơ đang hoạt động`);
+            errors.push(`Dòng ${e.row}: trùng CCCD đang hoạt động — giữ riêng chờ kiểm tra`);
             continue;
           }
         }
         const phoneDuplicate = worker.phone && [...people.values()].some(w => w.idCard !== worker.idCard && w.phone && phoneKey(w.phone) === worker.phone && !w.archivedAt && w.assignments.some(a => warns.has(a.status)));
         if (phoneDuplicate) {
           warnings.push(`Dòng ${e.row}: SĐT trùng hồ sơ đang hoạt động.`);
-          if (commit && !confirmPhone) {
+          if (commit) {
             errorCount++;
-            errors.push(`Dòng ${e.row}: chưa xác nhận SĐT trùng`);
+            errors.push(`Dòng ${e.row}: SĐT trùng — giữ riêng chờ kiểm tra`);
             continue;
           }
         }
@@ -491,7 +502,7 @@ export async function POST(request: NextRequest) {
             if (person?.assignments.some(a => identityKey(a) === identityKey(assignment))) throw new Error('Lượt PV đã được người khác thêm, tải lại dữ liệu');
             if (!person) person = await tx.worker.create({ data: { ...worker, fullName: worker.fullName, idCard: worker.idCard }, include: { assignments: true } });
             const a = await tx.workAssignment.create({ data: { ...assignment, interviewFactory: assignment.interviewFactory, workerId: person.id } });
-            await tx.assignmentEvent.create({ data: { assignmentId: a.id, occurredOn: today(), toStatus: a.status, interviewResult: a.interviewResult, operator: actor.username, note: 'Import Excel — thông tin từng lượt PV, không ghi đè lịch sử' } });
+            await tx.assignmentEvent.create({ data: { assignmentId: a.id, occurredOn: today(), toStatus: a.status, interviewResult: a.interviewResult, operator: actor.username, note: 'Import Excel — source:'+JSON.stringify({row:e.row,sheet:targetSheetName,file:file.name,values:raw,warnings:rowWarnings}) } });
             await tx.auditLog.create({ data: { module: 'WORKER', action: 'IMPORT', operator: actor.username, details: `Dòng ${e.row}: hồ sơ ${person.id}, lượt ${a.id}${old ? ' (thêm lịch sử vào hồ sơ cũ)' : ''}` } });
           });
           successCount++;
@@ -507,15 +518,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const review=splitImportReview([...warnings,...errors]);
+    const sourceId=commit?await saveImportSource(detectedType,file.name,targetSheetName,entries,warnings,errors):null;
     return NextResponse.json({
+      review, sourceId, normalizedSaved:successCount, sourceRowsSaved:commit?entries.length:0,mainSourceRows:entries.length-review.duplicateRows,pendingDuplicateCount:review.duplicateRows,
       success: true,
       preview: !commit,
       detectedType: 'DS_TONG',
       detectedTypeName: 'Hồ sơ nhân sự tổng (DS_TONG)',
       sheetUsed: targetSheetName,
-      summary: { totalRows: entries.length, successCount, readyCount, duplicateCount, errorCount, rehireCount },
-      errors,
-      warnings
+      summary: { totalRows: entries.length, successCount:commit?entries.length:0, readyCount:commit?0:entries.length, duplicateCount:review.duplicateRows, errorCount:0, warningCount:review.warningRows, cleanCount:entries.length-review.reviewRows, rehireCount }, normalizationErrors:errors,
+      errors:[],
+      warnings:review.warnings.map(i=>i.message), duplicates:review.duplicates.map(i=>i.message)
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: 'Không thể đọc file Excel. ' + (err?.message || 'Kiểm tra định dạng và thử lại.') }, { status: 400 });

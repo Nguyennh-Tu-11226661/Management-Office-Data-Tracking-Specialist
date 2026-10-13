@@ -5,7 +5,7 @@ const mappings: Record<string, string[]> = {
     fullName: ['Họ và tên', 'Họ tên'], idCard: ['số CCCD', 'Số CCCD', 'CCCD', 'CMT/CCCD'], phone: ['SĐT', 'Số điện thoại'], code: ['Mã NV'], dob: ['Ngày sinh'], gender: ['Giới tính'], idCardDate: ['Ngày cấp'], idCardPlace: ['Nơi cấp'], address: ['Địa chỉ'], province: ['Tỉnh/Thành'], recruiter: ['Tuyển dụng', 'Tuyển Dụng'], source: ['Nguồn'], interviewFactory: ['Nhà máy PV', 'Công ty'], workingFactory: ['Nhà máy làm việc'], contractType: ['Loại HD', 'Loại HĐ'], status: ['Tình trạng', 'TT'], leaveDate: ['Ngày NH'], leaveReason: ['Lý do'], shuttleBusKtx: ['Đón xe - KTX', 'Đón xe + KTX'], interviewDate: ['Ngày PV', 'Ngày phỏng vấn'], passedDate:['Ngày đỗ','Ngày PV đỗ'], interviewResult:['Kết quả PV','Kết Quả PV'], employeeCode:['Mã nhân viên tại công ty','Mã nhân viên'], team:['Team','Đội nhóm'], startDate:['Ngày bắt đầu làm','Ngày vào làm'],orderId:['Mã liên kết đơn hàng'],batchId:['Mã liên kết đợt'], expectedTrainingDate: ['Ngày Đào tạo dự kiến'], expectedTrainingStatus: ['Tình trạng Đào tạo dự kiến', 'Tình trạng đào tạo'], standardTrainingDate: ['Ngày đào tạo chuẩn'], onboardingMonth: ['Tháng nhận việc', 'Tháng']
 };
 const dates = ['dob', 'idCardDate', 'leaveDate', 'interviewDate', 'expectedTrainingDate', 'standardTrainingDate','passedDate','startDate'];
-export function parseImportRow(raw: Record<string, unknown>) {
+export function parseImportRow(raw: Record<string, unknown>, sourceImport = false) {
     const row = Object.fromEntries(Object.entries(raw).map(([k, v]) => [sourceHeader(k), v]));
     const body: Record<string, string> = {};
     for (const [field, headers] of Object.entries(mappings)) {
@@ -33,9 +33,9 @@ export function parseImportRow(raw: Record<string, unknown>) {
     assignment.employeeCode ||= body.employeeCode || body.code || '';
     assignment.team ||= body.team || '';
     assignment.status ||= 'Đang chờ phỏng vấn';
-    validateWorker(worker, assignment);
+    validateWorker(worker, assignment,true,sourceImport);
     validateInterview(assignment);
-    if (!['Đã nghỉ việc','Nghỉ hẳn','Hết hợp đồng','Bỏ xưởng','Bỏ vì sức khỏe','Hết phí'].includes(assignment.status)) {
+    if (!sourceImport && !['Đã nghỉ việc','Nghỉ hẳn','Hết hợp đồng','Bỏ xưởng','Bỏ vì sức khỏe','Hết phí'].includes(assignment.status)) {
         assignment.leaveDate = '';
         assignment.leaveReason = '';
     }

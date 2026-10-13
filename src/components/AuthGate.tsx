@@ -6,6 +6,7 @@ type User = {
     username: string;
     role: string;
     permissions: string[];
+    localAutoView?: boolean;
 };
 const AuthContext = createContext<User | null>(null);
 export const useIdentity = () => useContext(AuthContext);

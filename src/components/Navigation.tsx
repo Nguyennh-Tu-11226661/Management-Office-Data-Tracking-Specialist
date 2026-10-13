@@ -66,6 +66,7 @@ const navGroups: NavGroup[] = [
     group: 'HỆ THỐNG & CÔNG CỤ',
     items: [
       { href: '/excel-tools', label: 'Bộ máy Excel Engine', icon: FileSpreadsheet },
+      { href: '/import-review', label: 'Cảnh báo / Trùng import', icon: ShieldAlert },
       { href: '/catalogs', label: 'Danh mục cấu hình', icon: Layers },
       { href: '/audit', label: 'Lịch sử thay đổi', icon: History },
       { href: '/permissions', label: 'Phân quyền & Tài khoản', icon: Shield },
@@ -83,6 +84,7 @@ const TAB_TITLES: Record<string, { title: string; subtitle?: string }> = {
   '/rewards': { title: 'Mốc thưởng & Đã trả', subtitle: 'Tiến độ mốc công yêu cầu và ghi nhận chứng từ thanh toán' },
   '/bank-accounts': { title: 'Tài chính & STK 2026', subtitle: 'Đối chiếu số tài khoản ngân hàng và kiểm soát rủi ro lệch tên' },
   '/policies': { title: 'Chính sách thưởng', subtitle: 'Quy chế thưởng công nhân theo nhà máy và đơn hàng' },
+  '/import-review': {title:'Phân luồng import',subtitle:'Cảnh báo dữ liệu và danh sách trùng chờ kiểm tra'},
   '/excel-tools': { title: 'Bộ máy Excel Engine', subtitle: 'Nhập xuất dữ liệu DS_TONG, lệnh chi ngân hàng và cảnh báo trùng' },
   '/catalogs': { title: 'Danh mục cấu hình', subtitle: 'Thiết lập danh mục nhà máy, team và trạng thái lao động' },
   '/audit': { title: 'Lịch sử thay đổi', subtitle: 'Nhật ký kiểm toán toàn bộ thao tác thêm, sửa, xóa, duyệt' },
@@ -295,21 +297,15 @@ export default function Navigation({ children }: { children?: React.ReactNode })
                     <div className="text-xs font-semibold text-slate-800">{user.username}</div>
                     <div className="text-[10px] text-slate-400">{user.role}</div>
                   </div>
-                  <button
+                  {!user.localAutoView&&<button
                     onClick={handleLogout}
                     className="ml-1 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
                     title="Đăng xuất"
                   >
                     <LogOut className="h-4 w-4" />
-                  </button>
+                  </button>}
                 </div>
-              ) : (
-                <Link
-                  href="/login"
-                  className="rounded-lg bg-blue-600 px-3 py-1.5 font-semibold text-white hover:bg-blue-700 text-xs"
-                >
-                  Đăng nhập
-                </Link>
+              ) : (null
               )}
             </div>
           </div>

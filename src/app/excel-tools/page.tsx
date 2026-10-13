@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Upload, Button, Card, message, Alert, Table, Tag, Select, Segmented } from 'antd';
+import { Upload, Button, Card, message, Alert, Table, Tag, Select, Segmented, Tabs } from 'antd';
 import { FileSpreadsheet, UploadCloud, Download, CheckCircle2, AlertTriangle, Coins, CreditCard, Users, Sparkles } from 'lucide-react';
 
 const { Dragger } = Upload;
@@ -55,18 +55,9 @@ export default function ExcelToolsPage() {
 
         const isBonus = result?.detectedType === 'DS_THUONG';
         const isBank = result?.detectedType === 'BANK_ACCOUNTS';
-        const confirmText = isBonus
-            ? 'Xác nhận nạp bảng thưởng vào CSDL? Tiền thưởng các lần 1 → 7 sẽ được ghi nhận cho người lao động.'
-            : isBank
-            ? 'Xác nhận nạp danh sách STK vào CSDL? Thông tin tài khoản và kết quả đối soát sẽ được cập nhật.'
-            : 'Nhập các dòng hợp lệ vào CSDL? Dòng lỗi và lượt PV đã có sẽ được bỏ qua, không ghi đè.';
+        const confirmText = 'Ghi dòng cảnh báo vào danh sách chính và đưa dòng trùng vào danh sách chờ kiểm tra riêng? Toàn bộ nguồn vẫn được giữ, không ghi đè lượt đã có.';
 
         if (!window.confirm(confirmText)) return;
-
-        let confirmPhoneDuplicate = false;
-        if (result?.warnings?.some((w: string) => w.includes('SĐT'))) {
-            confirmPhoneDuplicate = window.confirm('Có SĐT trùng. Bạn đã xác minh và đồng ý nhập các dòng dùng chung số? Chọn Hủy để bỏ qua các dòng này.');
-        }
 
         setUploading(true);
         try {
@@ -74,18 +65,16 @@ export default function ExcelToolsPage() {
             data.append('file', pendingFile);
             data.append('confirm', 'true');
             data.append('importType', result?.detectedType || importMode);
-            data.append('confirmPhoneDuplicate', String(confirmPhoneDuplicate));
+
             if (profileId) data.append('profileId', profileId);
-            if (result?.warnings?.some((w: string) => w.includes('CCCD đang làm'))) {
-                data.append('confirmActiveDuplicate', String(window.confirm('Có CCCD đang làm/chưa đào tạo. Bạn đã xem lịch sử và đồng ý thêm đợt tuyển mới? Hủy để bỏ qua các dòng này.')));
-            }
+
 
             const r = await fetch('/api/excel-engine/import', { method: 'POST', body: data });
             const j = await r.json();
             if (j.success) {
                 setResult(j);
                 setPendingFile(null);
-                message.success(`Đã nạp thành công ${j.summary.successCount} dòng vào hệ thống!`);
+                message.success(`Đã giữ ${j.sourceRowsSaved} dòng nguồn; ${j.normalizedSaved} dòng được ghi vào hồ sơ nghiệp vụ.`);
             } else {
                 message.error(j.message);
             }
@@ -214,30 +203,12 @@ export default function ExcelToolsPage() {
                                     <CheckCircle2 className="w-4 h-4"/>
                                     Kết Quả Xử Lý Dữ Liệu
                                 </h4>
-                                <div className="grid grid-cols-3 gap-2 text-center">
-                                    <div className="bg-white p-2 rounded-lg border border-emerald-100">
-                                        <div className="text-xs text-slate-500">Tổng dòng</div>
-                                        <div className="text-base font-bold text-slate-800">
-                                            {result.summary?.totalRows}
-                                        </div>
-                                    </div>
-                                    <div className="bg-white p-2 rounded-lg border border-emerald-100">
-                                        <div className="text-xs text-emerald-600">
-                                            {result.preview ? 'Hợp lệ có thể nạp' : 'Đã nạp thành công'}
-                                        </div>
-                                        <div className="text-base font-bold text-emerald-700">
-                                            {result.preview ? result.summary?.readyCount : result.summary?.successCount}
-                                        </div>
-                                    </div>
-                                    <div className="bg-white p-2 rounded-lg border border-emerald-100">
-                                        <div className="text-xs text-rose-600">Lỗi / Trùng</div>
-                                        <div className="text-base font-bold text-rose-700">
-                                            {result.summary?.errorCount || result.summary?.duplicateCount || 0}
-                                        </div>
-                                    </div>
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-center">
+                                  {[{label:'Tổng dòng',value:result.summary?.totalRows,color:'text-slate-800'},{label:result.preview?'Dòng nguồn sẽ được giữ':'Đã giữ dòng nguồn',value:result.preview?result.summary?.readyCount:result.summary?.successCount,color:'text-emerald-700'},{label:'Dòng có cảnh báo',value:result.summary?.warningCount||0,color:'text-amber-800'},{label:'Dòng trùng lặp',value:result.summary?.duplicateCount||0,color:'text-rose-700'}].map(item=><div key={item.label} className="bg-white p-3 rounded-lg"><div className={`text-sm ${item.color}`}>{item.label}</div><div className={`text-xl font-bold ${item.color}`}>{item.value}</div></div>)}
                                 </div>
                             </div>
 
+                            <p className="text-xs text-slate-600">Đếm theo số dòng. {result.mainSourceRows??0} dòng vào danh sách chính (bao gồm cảnh báo); {result.pendingDuplicateCount??0} dòng trùng vào danh sách chờ kiểm tra riêng. Dòng vừa cảnh báo vừa trùng đi theo luồng trùng.</p>
                             {result.preview && pendingFile && (
                                 <Button
                                     type="primary"
@@ -247,43 +218,15 @@ export default function ExcelToolsPage() {
                                     onClick={commitImport}
                                     className="bg-emerald-600 hover:bg-emerald-500 font-bold shadow-md"
                                 >
-                                    Xác Nhận Nạp {result.summary?.readyCount} Dòng Hợp Lệ Vào CSDL
+                                    Xác nhận ghi dữ liệu và tách {result.summary?.duplicateCount||0} dòng trùng
                                 </Button>
                             )}
 
-                            {result.warnings?.length > 0 && (
-                                <Alert
-                                    type="warning"
-                                    showIcon
-                                    message="Cảnh báo kiểm tra dữ liệu"
-                                    description={
-                                        <div className="max-h-28 overflow-y-auto space-y-1 text-xs">
-                                            {result.warnings.slice(0, 10).map((w: string, i: number) => (
-                                                <div key={i}>• {w}</div>
-                                            ))}
-                                            {result.warnings.length > 10 && (
-                                                <div className="text-slate-500 italic">...và {result.warnings.length - 10} cảnh báo khác</div>
-                                            )}
-                                        </div>
-                                    }
-                                />
-                            )}
+                            <Tabs items={[
+                              {key:'warnings',label:`Cảnh báo dữ liệu (${result.summary?.warningCount||0} dòng)`,children:<><Alert type="warning" showIcon message="Kiểm tra giá trị thiếu/sai; vẫn giữ nguyên dòng nguồn" className="mb-3"/><Table<any> size="small" rowKey={(r,i)=>`${r.row}-${i}`} pagination={{pageSize:10}} dataSource={(result.review?.warnings||[]).filter((i:any)=>!result.review?.duplicates?.some((d:any)=>d.row===i.row))} columns={[{title:'Dòng Excel',dataIndex:'row',width:100},{title:'Cảnh báo dữ liệu',dataIndex:'message'}]}/><a className="text-blue-600" href="/import-review?type=warnings">Mở luồng cảnh báo dữ liệu đã lưu</a></>},
+                              {key:'duplicates',label:`Trùng lặp (${result.summary?.duplicateCount||0} dòng)`,children:<><Alert type="info" showIcon message="Đối chiếu danh tính hoặc lượt tuyển; không ghi đè hay tạo lượt trùng chính xác" className="mb-3"/><Table<any> size="small" rowKey={(r,i)=>`${r.row}-${i}`} pagination={{pageSize:10}} dataSource={result.review?.duplicates||[]} columns={[{title:'Dòng Excel',dataIndex:'row',width:100},{title:'Loại trùng',dataIndex:'kind',render:(v:string)=>({BANK_ACCOUNT:'STK đã có',PHONE:'Trùng SĐT',ACTIVE_IDENTITY:'CCCD đang hoạt động',BONUS:'Thưởng đã có',EXACT_RECRUITMENT:'Lượt tuyển đã có'} as Record<string,string>)[v]||v},{title:'Chi tiết',dataIndex:'message'}]}/><a className="text-blue-600" href="/import-review?type=duplicates">Mở luồng trùng lặp đã lưu</a></>}
+                            ]}/>
 
-                            {result.errors && result.errors.length > 0 && (
-                                <div>
-                                    <h5 className="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1.5">
-                                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500"/>
-                                        Chi Tiết Các Dòng Lỗi / Không Hợp Lệ ({result.errors.length} dòng):
-                                    </h5>
-                                    <div className="max-h-48 overflow-y-auto bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5 text-xs">
-                                        {result.errors.map((err: string, i: number) => (
-                                            <div key={i} className="text-rose-600">
-                                                • {err}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     )}
                 </Card>

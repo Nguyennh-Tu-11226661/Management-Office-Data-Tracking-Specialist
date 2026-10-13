@@ -31,10 +31,10 @@ export function dateKey(value: string): string | null {
         return null;
     return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
-export function validateWorker(worker: Record<string, any>, assignment: Record<string, any>, requireIdentity = true) {
+export function validateWorker(worker: Record<string, any>, assignment: Record<string, any>, requireIdentity = true, sourceImport = false) {
     if (requireIdentity && (!worker.fullName || typeof worker.idCard !== 'string' || !/^(\d{9}|\d{12})$/.test(worker.idCard)))
         throw new Error('Họ tên và CCCD 12 số hoặc CMT cũ 9 số là bắt buộc');
-    if (worker.phone && !/^0\d{9,10}$/.test(worker.phone))
+    if (!sourceImport && worker.phone && !/^0\d{9,10}$/.test(worker.phone))
         throw new Error('Số điện thoại không hợp lệ');
     if (!assignment.interviewFactory)
         throw new Error('Cần chọn nhà máy phỏng vấn');
@@ -43,14 +43,14 @@ export function validateWorker(worker: Record<string, any>, assignment: Record<s
     if (assignment.onboardingMonth && !/^T(0[1-9]|1[0-2])\.\d{4}$/.test(assignment.onboardingMonth))
         throw new Error('Kỳ nhận việc không hợp lệ');
     for (const field of ['dob', 'idCardDate'])
-        if (worker[field] && !dateKey(worker[field]))
+        if (!sourceImport && worker[field] && !dateKey(worker[field]))
             throw new Error(`Ngày ${field} không hợp lệ (dd/mm/yyyy hoặc yyyy-mm-dd)`);
     for (const field of ['leaveDate', 'interviewDate', 'expectedTrainingDate', 'standardTrainingDate'])
-        if (assignment[field] && !dateKey(assignment[field]))
+        if (!sourceImport && assignment[field] && !dateKey(assignment[field]))
             throw new Error(`Ngày ${field} không hợp lệ (dd/mm/yyyy hoặc yyyy-mm-dd)`);
-    if (['Đã nghỉ việc','Nghỉ hẳn','Hết hợp đồng','Bỏ xưởng','Bỏ vì sức khỏe','Hết phí'].includes(assignment.status) && (!assignment.leaveDate || !assignment.leaveReason))
+    if (!sourceImport && ['Đã nghỉ việc','Nghỉ hẳn','Hết hợp đồng','Bỏ xưởng','Bỏ vì sức khỏe','Hết phí'].includes(assignment.status) && (!assignment.leaveDate || !assignment.leaveReason))
         throw new Error('Cần ngày nghỉ và lý do nghỉ việc');
-    if (assignment.leaveDate && assignment.interviewDate && dateKey(assignment.leaveDate)! < dateKey(assignment.interviewDate)!)
+    if (!sourceImport && assignment.leaveDate && assignment.interviewDate && dateKey(assignment.leaveDate)! < dateKey(assignment.interviewDate)!)
         throw new Error('Ngày nghỉ không được trước ngày phỏng vấn');
 }
 

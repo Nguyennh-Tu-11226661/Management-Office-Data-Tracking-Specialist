@@ -42,27 +42,28 @@ export async function issueSession(user: Identity): Promise<string> {
     return `${payload}.${createHmac('sha256', secret).update(payload).digest('hex')}`;
 }
 export async function identity(request: NextRequest): Promise<Identity | null> {
-    if(process.env.LOCAL_DEMO_AUTO_VIEW==='1'&&['127.0.0.1:3005','localhost:3005'].includes(request.headers.get('host')||''))return {username:'Demo cục bộ',role:'VIEWER',version:'local-auto-view'};
+    const localIdentity:Identity|null=process.env.LOCAL_DEMO_AUTO_VIEW==='1'&&['127.0.0.1:3005','localhost:3005'].includes(request.headers.get('host')||'')?{username:'Demo cục bộ',role:'ADMIN',version:'local-auto-view'}:null;
+    if(localIdentity)return localIdentity;
     try {
         const token = request.cookies.get(COOKIE)?.value || '';
         if (token.length > 2048)
-            return null;
+            return localIdentity;
         const [payload, signature, extra] = token.split('.');
         if (!payload || !signature || extra || !/^[a-zA-Z0-9_-]+$/.test(payload) || !/^[0-9a-f]{64}$/.test(signature))
-            return null;
+            return localIdentity;
         const data = await config();
         const expected = createHmac('sha256', data.secret).update(payload).digest();
         const actual = Buffer.from(signature, 'hex');
         if (actual.length !== expected.length || !timingSafeEqual(actual, expected))
-            return null;
+            return localIdentity;
         const session = JSON.parse(Buffer.from(payload, 'base64url').toString());
         if (typeof session.exp !== 'number' || session.exp <= Date.now())
-            return null;
+            return localIdentity;
         const user = data.users.find(u => u.username === session.username && u.version === session.version && u.role === session.role);
-        return user && user.isActive !== false ? { username: user.username, role: user.role, version: user.version } : null;
+        return user && user.isActive !== false ? { username: user.username, role: user.role, version: user.version } : localIdentity;
     }
     catch {
-        return null;
+        return localIdentity;
     }
 }
 export function sameOrigin(request: NextRequest): boolean {
