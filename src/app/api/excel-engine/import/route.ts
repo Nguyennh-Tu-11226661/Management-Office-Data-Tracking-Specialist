@@ -2,6 +2,7 @@ import {splitImportReview} from '@/lib/import-review';
 import {saveImportSource} from '@/lib/import-source-store';
 import {sourceMonth,sourceRewardAmount,sourceStatuses} from '@/lib/source-format';
 import {dateKey} from '@/lib/worker-validation';
+import {matchFactory} from '@/lib/factory-matching';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import * as XLSX from 'xlsx';
@@ -167,8 +168,18 @@ export async function POST(request: NextRequest) {
 
           if (!worker) throw new Error('CCCD chưa có hồ sơ; nhập DS_TONG trước');
           if(typeof cccdRaw==='number')throw new Error('CCCD phải là Text');
-          const candidates=worker.assignments.filter(a=>(a.workingFactory||a.interviewFactory).toLowerCase()===company.toLowerCase()&&!!dateKey(interviewDate)&&dateKey(a.interviewDate||'')===dateKey(interviewDate)&&(!workerCode||a.employeeCode===workerCode||worker!.code===workerCode));
-          if(candidates.length!==1)throw new Error('Không xác định duy nhất đợt theo CCCD, công ty, ngày PV và mã NV');
+          const candidates = worker.assignments.filter(a =>
+            (matchFactory(a.interviewFactory, company) || matchFactory(a.workingFactory, company)) &&
+            (!workerCode || a.employeeCode === workerCode || worker!.code === workerCode)
+          );
+          let selectedAssignment = null;
+          if (candidates.length === 1) {
+            selectedAssignment = candidates[0];
+          } else if (candidates.length > 1) {
+            const exactDate = candidates.find(a => !!dateKey(interviewDate) && dateKey(a.interviewDate || '') === dateKey(interviewDate));
+            selectedAssignment = exactDate || candidates[0];
+          }
+          if (!selectedAssignment) throw new Error('Không xác định duy nhất đợt theo CCCD, công ty, ngày PV và mã NV');
           const sourceNote=JSON.stringify({source:'SOURCE_EXCEL_ACTUAL_PAID',monthOriginal:raw['Tháng'],sourceValues:raw,rewards:Array.from({length:7},(_,i)=>String(raw['Thưởng lần '+(i+1)]||'')),paymentDate:null,reference:null});
 
           if (commit) {
@@ -185,7 +196,7 @@ export async function POST(request: NextRequest) {
                 workerMap.set(idCard, worker);
               }
 
-              const assignmentId=candidates[0].id;
+              const assignmentId=selectedAssignment.id;
               const existingBonus = await tx.bonusRecord.findFirst({
                 where: {
                   workerId: worker.id,
@@ -474,21 +485,24 @@ export async function POST(request: NextRequest) {
           errors.push(`Dòng ${e.row}: lượt PV đã có (CCCD + nhà máy + ngày PV + mã NV), không ghi đè.`);
           continue;
         }
-        const activeDuplicate = old?.assignments.some(a => warns.has(a.status));
-        if (activeDuplicate) {
-          warnings.push(`Dòng ${e.row}: CCCD có đợt Đang làm việc/Chưa đào tạo; xem lịch sử trước khi thêm lượt.`);
+        const activeAssignment = old?.assignments.find(a => warns.has(a.status) || (!a.leaveDate && ['đang làm việc', 'đang lv', 'hết phí', 'chưa đào tạo', 'lv'].some(s => (a.status || '').toLowerCase().includes(s))));
+        if (activeAssignment) {
+          const actFactory = activeAssignment.workingFactory || activeAssignment.interviewFactory || 'Xưởng cũ';
+          warnings.push(`Dòng ${e.row}: [CHƯA BÁO NGHỈ] Đang làm việc tại ${actFactory} (chưa báo nghỉ) nhưng nạp đợt mới tại ${assignment.interviewFactory || 'xưởng mới'}.`);
           if (commit) {
             errorCount++;
-            errors.push(`Dòng ${e.row}: trùng CCCD đang hoạt động — giữ riêng chờ kiểm tra`);
+            errors.push(`Dòng ${e.row}: [CHƯA BÁO NGHỈ] CCCD đang làm việc tại ${actFactory} — giữ riêng chờ kiểm tra`);
             continue;
           }
         }
-        const phoneDuplicate = worker.phone && [...people.values()].some(w => w.idCard !== worker.idCard && w.phone && phoneKey(w.phone) === worker.phone && !w.archivedAt && w.assignments.some(a => warns.has(a.status)));
-        if (phoneDuplicate) {
-          warnings.push(`Dòng ${e.row}: SĐT trùng hồ sơ đang hoạt động.`);
+        const activePhoneWorker = worker.phone && [...people.values()].find(w => w.idCard !== worker.idCard && w.phone && phoneKey(w.phone) === worker.phone && !w.archivedAt && w.assignments.some(a => warns.has(a.status) || (!a.leaveDate && ['đang làm việc', 'đang lv', 'hết phí', 'chưa đào tạo', 'lv'].some(s => (a.status || '').toLowerCase().includes(s)))));
+        if (activePhoneWorker) {
+          const actAssignment = activePhoneWorker.assignments.find(a => warns.has(a.status) || !a.leaveDate);
+          const actFactory = actAssignment?.workingFactory || actAssignment?.interviewFactory || 'Xưởng khác';
+          warnings.push(`Dòng ${e.row}: [SĐT ĐANG HOẠT ĐỘNG] SĐT này đang đi làm tại ${actFactory} (công nhân ${activePhoneWorker.fullName}) nhưng đăng ký mới tại ${assignment.interviewFactory || 'xưởng mới'}.`);
           if (commit) {
             errorCount++;
-            errors.push(`Dòng ${e.row}: SĐT trùng — giữ riêng chờ kiểm tra`);
+            errors.push(`Dòng ${e.row}: [SĐT ĐANG HOẠT ĐỘNG] SĐT đang đi làm tại ${actFactory} — giữ riêng chờ kiểm tra`);
             continue;
           }
         }

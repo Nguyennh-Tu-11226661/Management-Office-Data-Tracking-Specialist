@@ -65,6 +65,7 @@ export default function WorkersPage() {
   const [recruiterFilter, setRecruiterFilter] = useState('');
   const [warningsOnly, setWarningsOnly] = useState(false);
   const [pendingDuplicateCount, setPendingDuplicateCount] = useState(0);
+  const [systemWarningCount, setSystemWarningCount] = useState(0);
   const [sourceTotals, setSourceTotals] = useState({ totalRows: 0, sourceRows: 0, warningRows: 0 });
 
   // Modal thêm mới
@@ -100,6 +101,7 @@ export default function WorkersPage() {
         setWorkers(json.data || []);
         setSourceOptions(json.options || {});
         setPendingDuplicateCount(json.pendingDuplicateCount || 0);
+        setSystemWarningCount(json.systemWarningCount || 0);
         setSourceTotals({
           totalRows: json.totalRows || 0,
           sourceRows: json.sourceRows || 0,
@@ -624,12 +626,12 @@ export default function WorkersPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 text-xs">
-              <a className="text-amber-700 font-medium hover:underline" href="/import-review?type=warnings">
-                Xem luồng cảnh báo ({sourceTotals.warningRows})
+              <a className="text-amber-700 font-semibold hover:underline" href="/import-review?type=warnings">
+                Xem luồng cảnh báo ({(systemWarningCount || sourceTotals.warningRows).toLocaleString('vi-VN')})
               </a>
               <span className="text-slate-300">|</span>
-              <a className="text-rose-600 font-medium hover:underline" href="/import-review?type=duplicates">
-                Trùng lặp chờ duyệt ({pendingDuplicateCount})
+              <a className="text-rose-600 font-semibold hover:underline" href="/import-review?type=duplicates">
+                Trùng lặp chờ duyệt ({pendingDuplicateCount.toLocaleString('vi-VN')})
               </a>
             </div>
           </div>
