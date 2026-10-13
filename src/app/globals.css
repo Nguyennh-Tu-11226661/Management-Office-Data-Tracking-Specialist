@@ -59,3 +59,22 @@ body {
 .ant-pagination {
   margin-top: 16px !important;
 }
+
+/* Overview reports fit the viewport; full fields remain in row details. */
+.overview-page .ant-card,
+.overview-page .ant-table-wrapper {
+  min-width: 0;
+  max-width: 100%;
+}
+.overview-table .ant-table-cell {
+  overflow-wrap: anywhere;
+  white-space: normal;
+  vertical-align: top;
+}
+.overview-page .ant-card-head-title {
+  white-space: normal;
+}
+.overview-table .ant-pagination {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}

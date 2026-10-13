@@ -2,7 +2,7 @@ const {spawn}=require('node:child_process');
 const path=require('node:path');
 const fs=require('node:fs');
 const preview=fs.existsSync('.local/evolution-preview.json')?JSON.parse(fs.readFileSync('.local/evolution-preview.json','utf8')):null;
-const localAutoView=fs.existsSync('.local/auto-open-demo.json')&&JSON.parse(fs.readFileSync('.local/auto-open-demo.json','utf8')).enabled===true;
+const localAutoView=process.env.LOCAL_DEMO_AUTO_VIEW!=='0';
 const mode=process.argv[2];
 if(!['dev','build','start'].includes(mode))throw new Error('Invalid Next.js mode');
 const args=[path.resolve('node_modules/next/dist/bin/next'),mode,...(mode==='build'?[]:['-H','127.0.0.1','-p',process.env.LOCAL_APP_PORT||'3000'])];

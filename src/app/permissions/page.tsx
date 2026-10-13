@@ -20,7 +20,7 @@ export default function PermissionsPage() {
         if (j.success) {
             setOpen(false);
             if (values.username === user?.username)
-                window.location.assign('/login');
+                window.location.reload();
             else
                 await load();
         }

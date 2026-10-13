@@ -93,17 +93,48 @@ export default function OverviewPage() {
   const table = (rows: any[], columns: any[]) => (
     <Table<any>
       size="small"
+      className="overview-table"
+      tableLayout="fixed"
       rowKey={(r, i) => r.id || `${r.name}-${i}`}
       loading={busy}
       dataSource={rows || []}
-      columns={columns}
-      pagination={{ pageSize: 10 }}
-      scroll={{ x: 1100 }}
+      columns={columns.slice(0, 4).map((column, index) => ({
+        ...column,
+        responsive: index > 1 ? ['md'] : undefined,
+      }))}
+      expandable={{
+        columnTitle: 'Chi tiết',
+        columnWidth: 88,
+        expandIcon: ({ expanded, onExpand, record }) => (
+          <Button size="small" type="link" aria-expanded={expanded}
+            onClick={(event) => onExpand(record, event)}>
+            {expanded ? 'Thu gọn' : 'Xem'}
+          </Button>
+        ),
+        expandedRowRender: (record) => (
+          <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 py-3">
+            {columns.map((column) => (
+              <div key={column.dataIndex} className="min-w-0">
+                <dt className="text-sm font-semibold text-slate-600 mb-1">{column.title}</dt>
+                <dd className="whitespace-pre-wrap break-words text-slate-900">
+                  {column.render ? column.render(record[column.dataIndex], record) : (record[column.dataIndex] ?? '—')}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ),
+      }}
+      pagination={{
+        defaultPageSize: 10,
+        showSizeChanger: true,
+        pageSizeOptions: [10, 20, 50, 100],
+        showTotal: (total, range) => `${range[0]}–${range[1]} / ${total} dòng`,
+      }}
     />
   );
 
   return (
-    <div className="space-y-6">
+    <div className="overview-page min-w-0 space-y-6">
       {/* 1. BỘ LỌC TỔNG QUÁT CẤP CAO (EXECUTIVE FILTERS) */}
       <Card className="shadow-xs border-slate-200">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -244,7 +275,7 @@ export default function OverviewPage() {
       </Card>
 
       {/* 2. KHUNG CHỈ SỐ KPI VĨ MÔ */}
-      {data?.sourcePaid&&<Card title="Thưởng đã trả theo file Excel gốc"><Statistic title="Tiền đã trả — nguồn Excel" value={data.sourcePaid.total} suffix="₫"/><p className="text-slate-600 my-3">Theo xác nhận của chủ dữ liệu. Chưa có ngày chi/chứng từ; hiện vật giữ nguyên mô tả, không quy đổi thành tiền. Không cộng trùng với bảng mốc thưởng nội bộ.</p>{table(data.sourcePaid.rows,[{title:'Người lao động',dataIndex:'name'},{title:'Công ty',dataIndex:'company'},{title:'Tháng nguồn',dataIndex:'month'},{title:'Đã trả (₫)',dataIndex:'paid',render:money},{title:'Nội dung gốc từng mốc',dataIndex:'sourceRewards'}])}</Card>}
+      {data?.sourcePaid&&<Card title="Thưởng đã trả theo file Excel gốc"><Statistic title="Tiền đã trả — nguồn Excel" value={data.sourcePaid.total} suffix="₫"/><p className="text-slate-600 my-3">Theo xác nhận của chủ dữ liệu. Chưa có ngày chi/chứng từ; hiện vật giữ nguyên mô tả, không quy đổi thành tiền. Không cộng trùng với bảng mốc thưởng nội bộ. Lọc nhà máy tại đây theo Công ty trong nguồn thưởng; tháng/khoảng ngày theo Ngày PV của dòng nguồn.</p><p className="text-sm text-amber-800 mb-3">{data.sourcePaid.unlinked} dòng chưa liên kết đợt; {data.sourcePaid.pending} dòng có số tiền chưa rõ hoặc xung đột, chưa cộng vào tổng.</p>{table(data.sourcePaid.companies,[{title:'Công ty nguồn',dataIndex:'name'},{title:'Số dòng',dataIndex:'rows'},{title:'Đã trả (₫)',dataIndex:'paid',render:money},{title:'Chưa liên kết',dataIndex:'unlinked'},{title:'Chờ đối chiếu',dataIndex:'pending'}])}{table(data.sourcePaid.rows,[{title:'Người lao động',dataIndex:'name'},{title:'Công ty',dataIndex:'company'},{title:'Tháng nguồn',dataIndex:'month'},{title:'Đã trả (₫)',dataIndex:'paid',render:money},{title:'Ngày PV nguồn',dataIndex:'interviewDate'},{title:'Chính sách nguồn',dataIndex:'policy'},{title:'Đối chiếu',dataIndex:'status'},{title:'Nội dung gốc từng mốc',dataIndex:'sourceRewards'}])}</Card>}
       {data && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">

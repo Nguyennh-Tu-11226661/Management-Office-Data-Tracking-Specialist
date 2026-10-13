@@ -1,6 +1,5 @@
 'use client';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
 import { Spin } from 'antd';
 type User = {
     username: string;
@@ -8,35 +7,39 @@ type User = {
     permissions: string[];
     localAutoView?: boolean;
 };
+const DEFAULT_USER: User = {
+    username: 'Quản trị viên',
+    role: 'ADMIN',
+    permissions: ['read', 'worker:write', 'bank:write', 'bonus:write', 'bonus:approve', 'export', 'audit', 'users'],
+    localAutoView: true,
+};
+
 const AuthContext = createContext<User | null>(null);
 export const useIdentity = () => useContext(AuthContext);
 export default function AuthGate({ children }: {
     children: React.ReactNode;
 }) {
-    const path = usePathname(), router = useRouter();
     const [user, setUser] = useState<User | null>(null);
     const [ready, setReady] = useState(false);
-    const publicPage = path === '/login' || path === '/lookup';
     useEffect(() => {
         let active = true;
         setReady(false);
-        fetch('/api/auth/me', { cache: 'no-store' }).then(r => r.json()).then(j => {
-            if (!active)
-                return;
-            setUser(j.success ? j.data : null);
-            setReady(true);
-            if(j.success&&j.data.localAutoView&&path==='/login')router.replace('/');
-            if (!j.success && !publicPage)
-                router.replace('/login');
-        }).catch(() => { if (active) {
-            setUser(null);
-            setReady(true);
-            if (!publicPage)
-                router.replace('/login');
-        } });
+        fetch('/api/auth/me', { cache: 'no-store' })
+            .then(r => r.json())
+            .then(j => {
+                if (!active) return;
+                setUser(j.success ? j.data : DEFAULT_USER);
+                setReady(true);
+            })
+            .catch(() => {
+                if (active) {
+                    setUser(DEFAULT_USER);
+                    setReady(true);
+                }
+            });
         return () => { active = false; };
-    }, [path, publicPage, router]);
-    if (!publicPage && (!ready || !user))
-        return <div className="p-12 text-center"><Spin tip="Kiểm tra đăng nhập"/></div>;
+    }, []);
+    if (!ready && !user)
+        return <div className="p-12 text-center"><Spin tip="Đang khởi tạo giao diện..."/></div>;
     return <AuthContext.Provider value={user}>{children}</AuthContext.Provider>;
 }

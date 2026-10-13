@@ -101,14 +101,6 @@ export default function Navigation({ children }: { children?: React.ReactNode })
     setIsOpenMobile(false);
   }, [pathname]);
 
-  if (pathname === '/login') {
-    return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        {children}
-      </div>
-    );
-  }
-
   const meta = TAB_TITLES[pathname] || {
     title: 'Trang điều hành • Tuyển dụng & Thưởng',
     subtitle: 'Hệ thống Quản trị Lao động Tri Thức Việt 2026',
@@ -116,10 +108,10 @@ export default function Navigation({ children }: { children?: React.ReactNode })
 
   const handleLogout = async () => {
     try {
-      const res = await fetch('/api/auth/logout', { method: 'POST' });
-      if (res.ok) window.location.assign('/login');
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.assign('/');
     } catch {
-      window.location.assign('/login');
+      window.location.assign('/');
     }
   };
 
@@ -135,7 +127,7 @@ export default function Navigation({ children }: { children?: React.ReactNode })
 
       {/* SIDEBAR BÊN TRÁI - PHONG CÁCH TRI THỨC VIỆT */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform duration-200 ease-in-out md:static md:translate-x-0 ${
+        className={`fixed top-0 bottom-0 left-0 z-50 flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white transition-transform duration-200 ease-in-out md:static md:translate-x-0 ${
           isOpenMobile ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -312,7 +304,7 @@ export default function Navigation({ children }: { children?: React.ReactNode })
         </header>
 
         {/* MAIN BODY CONTAINER */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1600px] w-full mx-auto">
+        <main className="flex-1 min-w-0 box-border p-4 sm:p-6 lg:p-8 max-w-[1600px] w-full mx-auto">
           {children}
         </main>
       </div>

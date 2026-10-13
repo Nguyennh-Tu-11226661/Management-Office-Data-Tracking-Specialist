@@ -42,8 +42,10 @@ export async function issueSession(user: Identity): Promise<string> {
     return `${payload}.${createHmac('sha256', secret).update(payload).digest('hex')}`;
 }
 export async function identity(request: NextRequest): Promise<Identity | null> {
-    const localIdentity:Identity|null=process.env.LOCAL_DEMO_AUTO_VIEW==='1'&&['127.0.0.1:3005','localhost:3005'].includes(request.headers.get('host')||'')?{username:'Demo cục bộ',role:'ADMIN',version:'local-auto-view'}:null;
-    if(localIdentity)return localIdentity;
+    const host = request.headers.get('host') || '';
+    const isLocal = ['127.0.0.1', 'localhost'].some(h => host.startsWith(h));
+    const localIdentity: Identity | null = process.env.LOCAL_DEMO_AUTO_VIEW !== '0' && isLocal ? { username: 'Quản trị viên', role: 'ADMIN', version: 'local-auto-view' } : null;
+    if (localIdentity) return localIdentity;
     try {
         const token = request.cookies.get(COOKIE)?.value || '';
         if (token.length > 2048)

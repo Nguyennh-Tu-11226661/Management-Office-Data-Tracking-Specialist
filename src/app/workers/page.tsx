@@ -1,265 +1,672 @@
 'use client';
-import {workerSourceColumns} from '@/lib/worker-source-view';
 import AssignmentFields from '@/components/AssignmentFields';
-import {STATUSES} from '@/lib/worker-validation';
+import { STATUSES } from '@/lib/worker-validation';
 import { useIdentity } from '@/components/AuthGate';
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Input, Select, Tag, Modal, Form, message, Popconfirm, Badge, Card, Space } from 'antd';
-import { UserPlus, Search, Download, Filter, AlertCircle, Edit3, Trash2, Building, CheckCircle2, XCircle, FileSpreadsheet } from 'lucide-react';
+import {
+  Table,
+  Button,
+  Input,
+  Select,
+  Tag,
+  Modal,
+  Form,
+  message,
+  Card,
+  Space,
+  Drawer,
+  Descriptions,
+  Tooltip,
+  Alert,
+} from 'antd';
+import {
+  UserPlus,
+  Search,
+  Download,
+  Filter,
+  AlertCircle,
+  Edit3,
+  Building,
+  Eye,
+  RotateCcw,
+  ExternalLink,
+} from 'lucide-react';
+
 const FACTORIES = [
-    'Luxshare QC',
-    'Canon',
-    'Goertek',
-    'Fushan',
-    'Amphenol',
-    'Foxconn',
-    'Luxshare VT',
-    'LG',
-    'Bảo vệ',
+  'Luxshare QC',
+  'Canon',
+  'Goertek',
+  'Fushan',
+  'Amphenol',
+  'Foxconn',
+  'Luxshare VT',
+  'LG',
+  'Bảo vệ',
 ];
+
 export default function WorkersPage() {
-    const user = useIdentity();
-    const canWrite = user?.permissions.includes('worker:write');
-    const [archived,setArchived]=useState(false);
-    const [month,setMonth]=useState('');
-    const [activeConfirm,setActiveConfirm]=useState(false);
-    const [rehire, setRehire] = useState(false);
-    const [historyWorker, setHistoryWorker] = useState<any>(null);
-    const [historyLoading, setHistoryLoading] = useState(false);
-    const [workers, setWorkers] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [search, setSearch] = useState('');
-    const [factoryFilter, setFactoryFilter] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
-    const [statusFilter, setStatusFilter] = useState('');
-    const [sourceOptions,setSourceOptions]=useState<Record<string,string[]>>({});
-    const [sourceMonth,setSourceMonth]=useState(''),[recruiterFilter,setRecruiterFilter]=useState(''),[columnFilter,setColumnFilter]=useState(''),[columnValue,setColumnValue]=useState('');
-    const [warningsOnly,setWarningsOnly]=useState(false);
-    const [pendingDuplicateCount,setPendingDuplicateCount]=useState(0);
-    const [unlinkedBonusRows,setUnlinkedBonusRows]=useState<any[]>([]);
-    const [sourceTotals,setSourceTotals]=useState({totalRows:0,sourceRows:0,warningRows:0});
-    // Modal thêm mới
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [addForm] = Form.useForm();
-    const [submitting, setSubmitting] = useState(false);
-    // Modal cập nhật nghỉ việc
-    const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-    const [selectedWorker, setSelectedWorker] = useState<any>(null);
-    const [statusForm] = Form.useForm();
-    const fetchWorkers = async () => {
-        try {
-            setLoading(true);
-            const params = new URLSearchParams({archived:String(archived),month,sourceMonth,recruiter:recruiterFilter,column:columnFilter,columnValue,...(warningsOnly?{warningsOnly:'true'}:{})});
-            if (search)
-                params.append('search', search);
-            if (factoryFilter)
-                params.append('factory', factoryFilter);
-            if (statusFilter)
-                params.append('status', statusFilter);
-            const res = await fetch(`/api/worker-source-rows?${params.toString()}`);
-            const json = await res.json();
-            if (json.success) {
-                setWorkers(json.data);setSourceOptions(json.options||{});setUnlinkedBonusRows(json.unlinkedBonusRows||[]);setPendingDuplicateCount(json.pendingDuplicateCount||0);setSourceTotals({totalRows:json.totalRows,sourceRows:json.sourceRows,warningRows:json.warningRows});
-            }
-        }
-        catch (err) {
-            message.error('Lỗi tải danh sách hồ sơ');
-        }
-        finally {
-            setLoading(false);
-        }
-    };
-    useEffect(() => {
-        setCurrentPage(1);
+  const user = useIdentity();
+  const canWrite = user?.permissions.includes('worker:write');
+  const [archived, setArchived] = useState(false);
+  const [month, setMonth] = useState('');
+  const [sourceMonth, setSourceMonth] = useState('');
+  const [activeConfirm, setActiveConfirm] = useState(false);
+  const [rehire, setRehire] = useState(false);
+  const [historyWorker, setHistoryWorker] = useState<any>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [workers, setWorkers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [factoryFilter, setFactoryFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [sourceOptions, setSourceOptions] = useState<Record<string, string[]>>({});
+  const [recruiterFilter, setRecruiterFilter] = useState('');
+  const [warningsOnly, setWarningsOnly] = useState(false);
+  const [pendingDuplicateCount, setPendingDuplicateCount] = useState(0);
+  const [sourceTotals, setSourceTotals] = useState({ totalRows: 0, sourceRows: 0, warningRows: 0 });
+
+  // Modal thêm mới
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addForm] = Form.useForm();
+  const [submitting, setSubmitting] = useState(false);
+
+  // Modal cập nhật nghỉ việc
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [selectedWorker, setSelectedWorker] = useState<any>(null);
+  const [statusForm] = Form.useForm();
+
+  // Drawer xem chi tiết hồ sơ
+  const [detailRecord, setDetailRecord] = useState<any>(null);
+
+  const fetchWorkers = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams({
+        archived: String(archived),
+        month,
+        sourceMonth,
+        recruiter: recruiterFilter,
+        ...(warningsOnly ? { warningsOnly: 'true' } : {}),
+      });
+      if (search) params.append('search', search);
+      if (factoryFilter) params.append('factory', factoryFilter);
+      if (statusFilter) params.append('status', statusFilter);
+
+      const res = await fetch(`/api/worker-source-rows?${params.toString()}`);
+      const json = await res.json();
+      if (json.success) {
+        setWorkers(json.data || []);
+        setSourceOptions(json.options || {});
+        setPendingDuplicateCount(json.pendingDuplicateCount || 0);
+        setSourceTotals({
+          totalRows: json.totalRows || 0,
+          sourceRows: json.sourceRows || 0,
+          warningRows: json.warningRows || 0,
+        });
+      }
+    } catch {
+      message.error('Lỗi tải danh sách hồ sơ');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchWorkers();
+  }, [factoryFilter, statusFilter, archived, month, sourceMonth, recruiterFilter, warningsOnly]);
+
+  const handleSearch = () => {
+    setCurrentPage(1);
+    fetchWorkers();
+  };
+
+  const handleResetFilters = () => {
+    setSearch('');
+    setFactoryFilter('');
+    setStatusFilter('');
+    setSourceMonth('');
+    setMonth('');
+    setRecruiterFilter('');
+    setWarningsOnly(false);
+    setCurrentPage(1);
+  };
+
+  // Xử lý thêm mới hồ sơ
+  const handleAddWorker = async (values: any) => {
+    try {
+      setSubmitting(true);
+      const res = await fetch('/api/workers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...values, rehire, confirmActiveDuplicate: activeConfirm }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        message.success('Đã thêm hồ sơ người lao động thành công!');
+        setIsAddModalOpen(false);
+        addForm.resetFields();
         fetchWorkers();
-    }, [factoryFilter, statusFilter,archived,month,sourceMonth,recruiterFilter,warningsOnly]);
-    const handleSearch = () => {
-        setCurrentPage(1);
-        fetchWorkers();
-    };
-    // Xử lý thêm mới hồ sơ
-    const handleAddWorker = async (values: any) => {
-        try {
-            setSubmitting(true);
-            const res = await fetch('/api/workers', {
+      } else {
+        if (json.duplicateType === 'ACTIVE_LABOR') {
+          Modal.confirm({
+            title: 'CCCD đang làm/chưa đào tạo',
+            content: json.message,
+            onOk: async () => {
+              const response = await fetch('/api/workers', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...values, rehire,confirmActiveDuplicate:activeConfirm }),
-            });
-            const json = await res.json();
-            if (json.success) {
-                message.success('Đã thêm hồ sơ người lao động thành công!');
-                setIsAddModalOpen(false);
-                addForm.resetFields();
-                fetchWorkers();
-            }
-            else {
-                if (json.duplicateType === 'ACTIVE_LABOR') {
-                    Modal.confirm({title:'CCCD đang làm/chưa đào tạo',content:json.message,onOk:async()=>{const response=await fetch('/api/workers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...values,rehire:true,confirmActiveDuplicate:true})});const result=await response.json();if(!result.success){message.error(result.message);throw new Error(result.message);}setIsAddModalOpen(false);fetchWorkers();}});
-                } else if (json.duplicateType === 'PHONE') {
-                    Modal.confirm({ title: 'Xác nhận dùng chung SĐT sau khi xác minh', content: json.message, onOk: async () => {
-                            const response = await fetch('/api/workers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...values, rehire, confirmPhoneDuplicate: true }) });
-                            const result = await response.json();
-                            if (!result.success) {
-                                message.error(result.message);
-                                throw new Error(result.message);
-                            }
-                            setIsAddModalOpen(false);
-                            addForm.resetFields();
-                            fetchWorkers();
-                        } });
-                }
-                else if (json.isDuplicate) {
-                    Modal.error({
-                        title: 'CẢNH BÁO TRÙNG LẶP DỮ LIỆU',
-                        content: json.message,
-                        okText: 'Đã hiểu',
-                    });
-                }
-                else {
-                    message.error(json.message || 'Lỗi thêm hồ sơ');
-                }
-            }
-        }
-        catch (err: any) {
-            message.error('Lỗi gửi dữ liệu lên máy chủ');
-        }
-        finally {
-            setSubmitting(false);
-        }
-    };
-    // Mở modal cập nhật trạng thái
-    const handleOpenStatusModal = (worker: any) => {
-        setSelectedWorker(worker);
-        const assignment = worker.assignments[0];
-        statusForm.resetFields();
-        statusForm.setFieldsValue({
-            ...worker,
-            ...assignment,
-            status: assignment?.status || 'Đang làm việc',
-            leaveDate: assignment?.leaveDate || '',
-            leaveReason: assignment?.leaveReason || '',
-            workingFactory: assignment?.workingFactory || assignment?.interviewFactory,
-        });
-        setIsStatusModalOpen(true);
-    };
-    // Lưu cập nhật trạng thái
-    const handleUpdateStatus = async (values: any) => {
-        if (!selectedWorker)
-            return;
-        try {
-            const res = await fetch(`/api/workers/${selectedWorker.id}`, {
-                method: 'PUT',
+                body: JSON.stringify({ ...values, rehire: true, confirmActiveDuplicate: true }),
+              });
+              const result = await response.json();
+              if (!result.success) {
+                message.error(result.message);
+                throw new Error(result.message);
+              }
+              setIsAddModalOpen(false);
+              fetchWorkers();
+            },
+          });
+        } else if (json.duplicateType === 'PHONE') {
+          Modal.confirm({
+            title: 'Xác nhận dùng chung SĐT sau khi xác minh',
+            content: json.message,
+            onOk: async () => {
+              const response = await fetch('/api/workers', {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...values, assignmentId: selectedWorker.assignments[0]?.id, updatedAt: selectedWorker.updatedAt, assignmentUpdatedAt: selectedWorker.assignments[0]?.updatedAt }),
-            });
-            const json = await res.json();
-            if (json.success) {
-                message.success('Đã cập nhật trạng thái hồ sơ');
-                setIsStatusModalOpen(false);
-                fetchWorkers();
-            }
-            else {
-                message.error(json.message);
-            }
+                body: JSON.stringify({ ...values, rehire, confirmPhoneDuplicate: true }),
+              });
+              const result = await response.json();
+              if (!result.success) {
+                message.error(result.message);
+                throw new Error(result.message);
+              }
+              setIsAddModalOpen(false);
+              addForm.resetFields();
+              fetchWorkers();
+            },
+          });
+        } else if (json.isDuplicate) {
+          Modal.error({
+            title: 'CẢNH BÁO TRÙNG LẶP DỮ LIỆU',
+            content: json.message,
+            okText: 'Đã hiểu',
+          });
+        } else {
+          message.error(json.message || 'Lỗi thêm hồ sơ');
         }
-        catch (err) {
-            message.error('Lỗi cập nhật');
-        }
-    };
+      }
+    } catch {
+      message.error('Lỗi gửi dữ liệu lên máy chủ');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-    const handleOpenHistory = async (record: any) => {
-        try {
-            setHistoryLoading(true);
-            setHistoryWorker(record);
-            const res = await fetch(`/api/worker-history?id=${record.id}`);
-            const json = await res.json();
-            if (json.success && json.data?.[0]) {
-                setHistoryWorker(json.data[0]);
-            }
-        } catch {
-            // Giữ record hiện tại
-        } finally {
-            setHistoryLoading(false);
-        }
-    };
+  // Mở modal cập nhật trạng thái
+  const handleOpenStatusModal = (worker: any) => {
+    setSelectedWorker(worker);
+    const assignment = worker.assignments?.[0];
+    statusForm.resetFields();
+    statusForm.setFieldsValue({
+      fullName: worker.sourceValues?.['Họ và tên'] || worker.fullName,
+      idCard: worker.sourceValues?.['Số CCCD'] || worker.idCard,
+      phone: worker.sourceValues?.['SĐT'] || worker.phone,
+      ...worker,
+      ...assignment,
+      status: worker.sourceValues?.['Tình trạng'] || assignment?.status || 'Đang làm việc',
+      leaveDate: worker.sourceValues?.['Ngày NH'] || assignment?.leaveDate || '',
+      leaveReason: worker.sourceValues?.['Lý do'] || assignment?.leaveReason || '',
+      workingFactory:
+        worker.sourceValues?.['Nhà máy làm việc'] ||
+        assignment?.workingFactory ||
+        assignment?.interviewFactory,
+    });
+    setIsStatusModalOpen(true);
+  };
 
-    const columns = [
-      ...workerSourceColumns.map(column=>({title:column,key:column,width:column==='Địa chỉ'?260:column==='Họ và tên'?190:150,render:(_:any,record:any,index:number)=>column==='STT'?String(record.sourceValues?.STT??((currentPage-1)*pageSize+index+1)):<span className="whitespace-pre-wrap">{String(record.sourceValues?.[column]??'')||'—'}</span>})),
-      {title:'Cảnh báo dữ liệu / nguồn',key:'warnings',width:280,render:(_:any,r:any)=><div><Tag color={r.sourceWarnings?.length?'warning':'blue'}>{r.sourceWarnings?.length?'Cần kiểm tra':'Dữ liệu nguồn'}</Tag>{!!r.sourceDuplicates?.length&&<a href="/import-review?type=duplicates"><Tag color="red">Trùng lặp — xem luồng riêng</Tag></a>}<p className="text-xs text-slate-600">{r.sourceFile}{r.sourceRow?` · dòng ${r.sourceRow}`:''}</p>{(r.sourceWarnings||[]).map((w:string,i:number)=><p key={i} className="text-xs text-amber-800">{w}</p>)}</div>},
-      {title:'Hồ sơ / lịch sử',key:'actions',width:200,render:(_:any,r:any)=>r.workerId?<a href={`/workers/${r.workerId}`} className="text-blue-600">Xem hồ sơ và thưởng theo đợt</a>:<span className="text-amber-800">Chưa liên kết hồ sơ; vẫn giữ dòng nguồn</span>},
-    ];
-    return (<div className="space-y-6">
-      {/* Title & Actions */}
+  // Lưu cập nhật trạng thái
+  const handleUpdateStatus = async (values: any) => {
+    if (!selectedWorker) return;
+    try {
+      const targetId = selectedWorker.workerId || selectedWorker.id;
+      const res = await fetch(`/api/workers/${targetId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...values,
+          assignmentId: selectedWorker.assignments?.[0]?.id,
+          updatedAt: selectedWorker.updatedAt,
+          assignmentUpdatedAt: selectedWorker.assignments?.[0]?.updatedAt,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        message.success('Đã cập nhật trạng thái hồ sơ');
+        setIsStatusModalOpen(false);
+        fetchWorkers();
+      } else {
+        message.error(json.message);
+      }
+    } catch {
+      message.error('Lỗi cập nhật');
+    }
+  };
+
+  const handleOpenHistory = async (record: any) => {
+    const targetId = record.workerId || record.id;
+    if (!targetId) return;
+    try {
+      setHistoryLoading(true);
+      setHistoryWorker(record);
+      const res = await fetch(`/api/worker-history?id=${targetId}`);
+      const json = await res.json();
+      if (json.success && json.data?.[0]) {
+        setHistoryWorker(json.data[0]);
+      }
+    } catch {
+      // Giữ record hiện tại
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const getStatusTag = (status: string) => {
+    const s = String(status || '').trim();
+    if (!s) return <Tag>Chưa có TT</Tag>;
+    if (['Đang làm việc', 'LV', 'Chuyển chính thức'].includes(s)) {
+      return <Tag color="success">{s}</Tag>;
+    }
+    if (['Đã nghỉ việc', 'NH', 'Nghỉ hẳn', 'HHĐ', 'Hết hợp đồng', 'Tự ý nghỉ việc'].includes(s)) {
+      return <Tag color="error">{s}</Tag>;
+    }
+    if (['Bỏ xưởng', 'Bỏ XX', 'Bỏ ĐT', 'Bỏ phỏng vấn', 'Bỏ đào tạo', 'Bỏ khác'].includes(s)) {
+      return <Tag color="warning">{s}</Tag>;
+    }
+    if (['Trượt phỏng vấn', 'Trượt KSK'].includes(s)) {
+      return <Tag color="magenta">{s}</Tag>;
+    }
+    if (['Đang đào tạo', 'Chưa đào tạo', 'Đang chờ phỏng vấn'].includes(s)) {
+      return <Tag color="processing">{s}</Tag>;
+    }
+    return <Tag color="default">{s}</Tag>;
+  };
+
+  // 22 CỘT CHUẨN TỪ FILE QUẢN LÝ
+  const columns = [
+    {
+      title: 'STT',
+      key: 'STT',
+      width: 60,
+      fixed: 'left' as const,
+      align: 'center' as const,
+      render: (_: any, __: any, index: number) =>
+        (currentPage - 1) * pageSize + index + 1,
+    },
+    {
+      title: 'Họ và tên',
+      key: 'Họ và tên',
+      width: 175,
+      fixed: 'left' as const,
+      render: (_: any, record: any) => {
+        const name = record.sourceValues?.['Họ và tên'] || record.fullName || '—';
+        const hasWarning = (record.sourceWarnings || []).length > 0;
+        return (
+          <div className="flex items-center justify-between gap-1">
+            <button
+              type="button"
+              onClick={() => setDetailRecord(record)}
+              className="text-left font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer truncate"
+              title={name}
+            >
+              {name}
+            </button>
+            {hasWarning && (
+              <Tooltip title={`${record.sourceWarnings.length} cảnh báo cần kiểm tra`}>
+                <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 inline-block" />
+              </Tooltip>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      title: 'Số CCCD',
+      key: 'Số CCCD',
+      width: 135,
+      fixed: 'left' as const,
+      render: (_: any, record: any) => (
+        <span className="font-mono text-xs text-slate-800">
+          {record.sourceValues?.['Số CCCD'] || record.idCard || '—'}
+        </span>
+      ),
+    },
+    {
+      title: 'Nhà máy PV',
+      key: 'Nhà máy PV',
+      width: 120,
+      render: (_: any, record: any) => record.sourceValues?.['Nhà máy PV'] || '—',
+    },
+    {
+      title: 'Nhà máy làm việc',
+      key: 'Nhà máy làm việc',
+      width: 130,
+      render: (_: any, record: any) => record.sourceValues?.['Nhà máy làm việc'] || '—',
+    },
+    {
+      title: 'Loại HĐ',
+      key: 'Loại HĐ',
+      width: 155,
+      render: (_: any, record: any) => {
+        const val =
+          record.sourceValues?.['Loại HĐ'] ||
+          record.sourceValues?.['Loại HD'] ||
+          record.assignments?.[0]?.contractType;
+        return val ? (
+          <span className="font-medium text-xs text-slate-800">{val}</span>
+        ) : (
+          <span className="text-slate-400">—</span>
+        );
+      },
+    },
+    {
+      title: 'Tình trạng',
+      key: 'Tình trạng',
+      width: 125,
+      render: (_: any, record: any) => getStatusTag(record.sourceValues?.['Tình trạng']),
+    },
+    {
+      title: 'Ngày NH',
+      key: 'Ngày NH',
+      width: 100,
+      render: (_: any, record: any) => {
+        const val = record.sourceValues?.['Ngày NH'];
+        return val ? <span className="text-rose-600 font-medium text-xs">{val}</span> : <span className="text-slate-400">—</span>;
+      },
+    },
+    {
+      title: 'Lý do',
+      key: 'Lý do',
+      width: 150,
+      ellipsis: true,
+      render: (_: any, record: any) => record.sourceValues?.['Lý do'] || '—',
+    },
+    {
+      title: 'Mã NV',
+      key: 'Mã NV',
+      width: 95,
+      render: (_: any, record: any) => {
+        const val = record.sourceValues?.['Mã NV'];
+        return val ? <span className="font-mono text-xs">{val}</span> : <span className="text-slate-400">—</span>;
+      },
+    },
+    {
+      title: 'Ngày sinh',
+      key: 'Ngày sinh',
+      width: 100,
+      render: (_: any, record: any) => record.sourceValues?.['Ngày sinh'] || '—',
+    },
+    {
+      title: 'Giới tính',
+      key: 'Giới tính',
+      width: 75,
+      align: 'center' as const,
+      render: (_: any, record: any) => record.sourceValues?.['Giới tính'] || '—',
+    },
+    {
+      title: 'Ngày cấp',
+      key: 'Ngày cấp',
+      width: 100,
+      render: (_: any, record: any) => record.sourceValues?.['Ngày cấp'] || '—',
+    },
+    {
+      title: 'Địa chỉ',
+      key: 'Địa chỉ',
+      width: 180,
+      ellipsis: true,
+      render: (_: any, record: any) => record.sourceValues?.['Địa chỉ'] || '—',
+    },
+    {
+      title: 'SĐT',
+      key: 'SĐT',
+      width: 110,
+      render: (_: any, record: any) => {
+        const val = record.sourceValues?.['SĐT'];
+        return val ? <span className="font-mono text-xs">{val}</span> : <span className="text-slate-400">—</span>;
+      },
+    },
+    {
+      title: 'Tuyển dụng',
+      key: 'Tuyển dụng',
+      width: 125,
+      render: (_: any, record: any) => record.sourceValues?.['Tuyển dụng'] || '—',
+    },
+    {
+      title: 'Đón xe + KTX',
+      key: 'Đón xe + KTX',
+      width: 120,
+      render: (_: any, record: any) => record.sourceValues?.['Đón xe + KTX'] || '—',
+    },
+    {
+      title: 'Ngày PV',
+      key: 'Ngày PV',
+      width: 100,
+      render: (_: any, record: any) => record.sourceValues?.['Ngày PV'] || '—',
+    },
+    {
+      title: 'Ngày Đào tạo dự kiến',
+      key: 'Ngày Đào tạo dự kiến',
+      width: 120,
+      render: (_: any, record: any) => record.sourceValues?.['Ngày Đào tạo dự kiến'] || '—',
+    },
+    {
+      title: 'Tình trạng đào tạo',
+      key: 'Tình trạng đào tạo',
+      width: 130,
+      render: (_: any, record: any) => record.sourceValues?.['Tình trạng đào tạo'] || '—',
+    },
+    {
+      title: 'Ngày đào tạo chuẩn',
+      key: 'Ngày đào tạo chuẩn',
+      width: 120,
+      render: (_: any, record: any) => record.sourceValues?.['Ngày đào tạo chuẩn'] || '—',
+    },
+    {
+      title: 'Tháng nhận việc',
+      key: 'Tháng nhận việc',
+      width: 110,
+      render: (_: any, record: any) => {
+        const val = record.sourceValues?.['Tháng nhận việc'];
+        return val ? <span className="font-semibold text-xs text-slate-800">{val}</span> : <span className="text-slate-400">—</span>;
+      },
+    },
+    {
+      title: 'Thao tác',
+      key: 'actions',
+      width: 110,
+      fixed: 'right' as const,
+      align: 'center' as const,
+      render: (_: any, record: any) => (
+        <Space size={2}>
+          <Button
+            type="text"
+            size="small"
+            className="text-blue-600 hover:text-blue-800 px-1"
+            icon={<Eye className="w-3.5 h-3.5 inline mr-0.5" />}
+            onClick={() => setDetailRecord(record)}
+          >
+            Xem
+          </Button>
+          {canWrite && (
+            <Button
+              type="text"
+              size="small"
+              className="text-slate-600 hover:text-slate-800 px-1"
+              icon={<Edit3 className="w-3.5 h-3.5 inline mr-0.5" />}
+              onClick={() => handleOpenStatusModal(record)}
+            >
+              Sửa
+            </Button>
+          )}
+        </Space>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            Hồ Sơ Lao Động Master Data (`DS_TONG`)
-          </h1>
+          <h1 className="text-2xl font-bold text-slate-900">Danh sách người lao động</h1>
           <p className="text-xs text-slate-500 mt-1">
-            Đối chiếu đủ 22 cột Excel, xem từng dòng nguồn và từng lượt tuyển. Dữ liệu chưa hợp lệ giữ nguyên kèm cảnh báo.
+            Hiển thị đầy đủ 22 cột quản lý nguồn Excel. Khóa cố định cột Họ tên &amp; CCCD khi cuộn ngang.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Input type="month" value={month} onChange={e=>setMonth(e.target.value)} className="w-40" placeholder="Lọc theo tháng"/>
+        <div className="flex flex-wrap items-center gap-2">
           <a href="/api/excel-engine/export?type=WORKERS">
-            <Button icon={<Download className="w-4 h-4"/>}>Xuất Excel DS_TONG</Button>
+            <Button icon={<Download className="w-4 h-4" />}>Xuất Excel DS_TONG</Button>
           </a>
-          <Button type="primary" disabled={!canWrite} icon={<UserPlus className="w-4 h-4"/>} onClick={() => {
-            setRehire(false);
-            addForm.resetFields();
-            setIsAddModalOpen(true);
-        }}>
+          <Button
+            type="primary"
+            disabled={!canWrite}
+            icon={<UserPlus className="w-4 h-4" />}
+            onClick={() => {
+              setRehire(false);
+              addForm.resetFields();
+              setIsAddModalOpen(true);
+            }}
+          >
             Thêm Hồ Sơ Mới
           </Button>
         </div>
       </div>
 
-      {/* Filter Bar */}
+      {/* Filter Card */}
       <Card className="shadow-sm border-slate-200">
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <div><label className="block font-medium mb-2">Tìm trong toàn bộ cột</label><Input placeholder="Tên, CCCD, mã NV, SĐT, nội dung nguồn..." value={search} onChange={e=>setSearch(e.target.value)} onPressEnter={handleSearch} allowClear/></div>
-          <div><label className="block font-medium mb-2">Nhà máy phỏng vấn</label><Select className="w-full" allowClear value={factoryFilter||undefined} onChange={v=>setFactoryFilter(v||'')} options={(sourceOptions['Nhà máy PV']||[]).map(value=>({value,label:value}))}/></div>
-          <div><label className="block font-medium mb-2">Tình trạng trong Excel</label><Select className="w-full" allowClear value={statusFilter||undefined} onChange={v=>setStatusFilter(v||'')} options={(sourceOptions['Tình trạng']||[]).map(value=>({value,label:value}))}/></div>
-          <div><label className="block font-medium mb-2">Tháng nhận việc trong Excel</label><Select className="w-full" allowClear value={sourceMonth||undefined} onChange={v=>setSourceMonth(v||'')} options={(sourceOptions['Tháng nhận việc']||[]).map(value=>({value,label:value}))}/></div>
-          <div><label className="block font-medium mb-2">Tuyển dụng</label><Select className="w-full" allowClear value={recruiterFilter||undefined} onChange={v=>setRecruiterFilter(v||'')} options={(sourceOptions['Tuyển dụng']||[]).map(value=>({value,label:value}))}/></div>
-          <div><label className="block font-medium mb-2">Lọc theo cột bất kỳ</label><Select className="w-full" allowClear value={columnFilter||undefined} onChange={v=>setColumnFilter(v||'')} options={workerSourceColumns.map(value=>({value,label:value}))}/></div>
-          <div><label className="block font-medium mb-2">Giá trị chứa</label><Input value={columnValue} onChange={e=>setColumnValue(e.target.value)} onPressEnter={handleSearch} placeholder="Nhập nội dung cần lọc"/></div>
-          <div className="flex flex-wrap gap-2 items-end"><Button onClick={handleSearch} icon={<Filter className="w-4 h-4"/>}>Áp dụng bộ lọc</Button><Button onClick={()=>setWarningsOnly(!warningsOnly)} type={warningsOnly?'primary':'default'}>Chỉ dòng cảnh báo</Button></div>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Tìm kiếm</label>
+              <Input
+                placeholder="Tên, CCCD, SĐT, Mã NV..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onPressEnter={handleSearch}
+                prefix={<Search className="w-3.5 h-3.5 text-slate-400" />}
+                allowClear
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Nhà máy phỏng vấn</label>
+              <Select
+                className="w-full"
+                allowClear
+                placeholder="Tất cả nhà máy"
+                value={factoryFilter || undefined}
+                onChange={(v) => setFactoryFilter(v || '')}
+                options={(sourceOptions['Nhà máy PV'] || []).map((value) => ({ value, label: value }))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Tình trạng</label>
+              <Select
+                className="w-full"
+                allowClear
+                placeholder="Tất cả tình trạng"
+                value={statusFilter || undefined}
+                onChange={(v) => setStatusFilter(v || '')}
+                options={(sourceOptions['Tình trạng'] || []).map((value) => ({ value, label: value }))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Tháng nhận việc</label>
+              <Select
+                className="w-full"
+                allowClear
+                placeholder="Tất cả tháng nhận việc"
+                value={sourceMonth || undefined}
+                onChange={(v) => setSourceMonth(v || '')}
+                options={(sourceOptions['Tháng nhận việc'] || []).map((value) => ({ value, label: value }))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Người tuyển dụng</label>
+              <Select
+                className="w-full"
+                allowClear
+                placeholder="Tất cả tuyển dụng"
+                value={recruiterFilter || undefined}
+                onChange={(v) => setRecruiterFilter(v || '')}
+                options={(sourceOptions['Tuyển dụng'] || []).map((value) => ({ value, label: value }))}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="primary" onClick={handleSearch} icon={<Filter className="w-4 h-4" />}>
+                Áp dụng lọc
+              </Button>
+              <Button onClick={handleResetFilters} icon={<RotateCcw className="w-4 h-4" />}>
+                Đặt lại
+              </Button>
+              <Button
+                type={warningsOnly ? 'primary' : 'default'}
+                danger={warningsOnly}
+                onClick={() => setWarningsOnly(!warningsOnly)}
+              >
+                {warningsOnly ? 'Đang lọc: Chỉ dòng cảnh báo' : 'Chỉ dòng cảnh báo'}
+              </Button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <a className="text-amber-700 font-medium hover:underline" href="/import-review?type=warnings">
+                Xem luồng cảnh báo ({sourceTotals.warningRows})
+              </a>
+              <span className="text-slate-300">|</span>
+              <a className="text-rose-600 font-medium hover:underline" href="/import-review?type=duplicates">
+                Trùng lặp chờ duyệt ({pendingDuplicateCount})
+              </a>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-3 mt-4"><a className="text-amber-800" href="/import-review?type=warnings">Xem luồng cảnh báo</a><a className="text-rose-700" href="/import-review?type=duplicates">Danh sách trùng chờ kiểm tra ({pendingDuplicateCount})</a></div>
-        <p className="text-sm text-slate-600 mt-4">{workers.length.toLocaleString('vi-VN')} dòng đang hiển thị / {sourceTotals.totalRows.toLocaleString('vi-VN')} dòng; {sourceTotals.sourceRows.toLocaleString('vi-VN')} dòng nguồn Excel, {sourceTotals.warningRows.toLocaleString('vi-VN')} dòng cảnh báo. Dòng cảnh báo vẫn hiển thị; dòng trùng nằm ở danh sách kiểm tra riêng.</p>
       </Card>
 
-      {/* Data Table */}
-      <Card className="shadow-sm border-slate-200 overflow-hidden">
-        {/* Thanh chuyển đổi tab DS_TONG và Tháng cũ giống Excel */}
-        <div className="flex flex-wrap items-center justify-between gap-3 p-3 mb-3 bg-slate-50 border border-slate-200 rounded-xl">
+      {/* Main Table Card */}
+      <Card className="shadow-sm border-slate-200">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-2">
             <Button
-              type={!archived ? "primary" : "default"}
-              onClick={() => { setArchived(false); setCurrentPage(1); }}
-              className="font-bold text-xs"
+              type={!archived ? 'primary' : 'default'}
+              size="small"
+              onClick={() => {
+                setArchived(false);
+                setCurrentPage(1);
+              }}
+              className="font-semibold text-xs"
             >
-              📁 Tab `DS_TONG` (Hồ Sơ Hiện Hành)
+              Hồ sơ hiện hành
             </Button>
             <Button
-              type={archived ? "primary" : "default"}
-              onClick={() => { setArchived(true); setCurrentPage(1); }}
-              className="font-bold text-xs"
+              type={archived ? 'primary' : 'default'}
+              size="small"
+              onClick={() => {
+                setArchived(true);
+                setCurrentPage(1);
+              }}
+              className="font-semibold text-xs"
             >
-              🗂️ Tab `Tháng Cũ` (Hồ Sơ Lưu Trữ)
+              Hồ sơ lưu trữ
             </Button>
-            <a href="/duplicates">
-              <Button type="default" danger className="font-semibold text-xs">
-                ⚠️ Tab `Cảnh Báo Trùng Lặp`
-              </Button>
-            </a>
           </div>
 
           <div className="text-xs text-slate-500 font-medium">
-            * Bảng hiển thị đầy đủ <strong>22 cột dữ liệu</strong> chuẩn theo mẫu Excel DS_TONG (Cuộn ngang để xem hết các cột)
+            Hiển thị <strong>{workers.length.toLocaleString('vi-VN')}</strong> dòng /{' '}
+            {sourceTotals.totalRows.toLocaleString('vi-VN')} dòng nguồn tổng
           </div>
         </div>
 
@@ -267,9 +674,10 @@ export default function WorkersPage() {
           columns={columns}
           dataSource={workers}
           rowKey="id"
-          expandable={{expandedRowRender:(r:any)=><div className="p-3"><h3 className="font-semibold mb-2">Nội dung Thưởng.xlsx cùng CCCD · công ty · ngày PV</h3><p className="text-sm text-slate-600 mb-3">Giữ nguyên các ô nguồn; đây là đối chiếu dữ liệu, không tự xác minh điều kiện hay chứng từ chi trả.</p><Table<any> rowKey="id" pagination={false} size="small" scroll={{x:3200}} dataSource={r.rewardSource||[]} columns={['Công ty','Tháng','Ngày PV','Chính sách','Mã nhân viên','Họ tên','Số CCCD','STK','Ngân hàng',...Array.from({length:7},(_,i)=>`Thưởng lần ${i+1}`)].map(name=>({title:name,key:name,width:190,render:(_:any,b:any)=>String(b.values?.[name]??'')||'—'}))}/></div>}}
           loading={loading}
-          scroll={{ x: 4200 }}
+          scroll={{ x: 2700 }}
+          bordered
+          size="small"
           pagination={{
             current: currentPage,
             pageSize: pageSize,
@@ -281,12 +689,200 @@ export default function WorkersPage() {
             },
             showTotal: (total, range) => `${range[0]} - ${range[1]} / ${total} dòng nguồn / lượt tuyển`,
           }}
-          bordered
-          size="middle"
+          locale={{ emptyText: 'Không tìm thấy dòng phù hợp với bộ lọc hiện tại.' }}
         />
       </Card>
 
-      {!!unlinkedBonusRows.length&&<Card title={`Thưởng nguồn chưa liên kết hồ sơ (${unlinkedBonusRows.length} dòng)`}><p className="text-amber-800 mb-3">Các dòng này vẫn được giữ. Cần đối chiếu CCCD, công ty và ngày PV; không tự ghép sang hồ sơ khác.</p><Table<any> rowKey="id" dataSource={unlinkedBonusRows} pagination={{pageSize:10}} scroll={{x:3200}} columns={['Công ty','Tháng','Ngày PV','Chính sách','Mã nhân viên','Họ tên','Số CCCD','STK','Ngân hàng',...Array.from({length:7},(_,i)=>`Thưởng lần ${i+1}`)].map(name=>({title:name,key:name,width:190,render:(_:any,b:any)=>String(b.values?.[name]??'')||'—'}))}/></Card>}
+      {/* Drawer Xem Chi Tiết Toàn Bộ 22 Trường */}
+      <Drawer
+        title={
+          <div className="flex items-center justify-between pr-4">
+            <div className="flex items-center gap-2">
+              <span className="text-base font-bold text-slate-900">
+                {detailRecord?.sourceValues?.['Họ và tên'] || detailRecord?.fullName || 'Chi tiết hồ sơ'}
+              </span>
+              {getStatusTag(detailRecord?.sourceValues?.['Tình trạng'])}
+            </div>
+            {detailRecord?.workerId && (
+              <a
+                href={`/workers/${detailRecord.workerId}`}
+                className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-normal"
+              >
+                Mở trang hồ sơ <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+          </div>
+        }
+        open={!!detailRecord}
+        onClose={() => setDetailRecord(null)}
+        width={720}
+      >
+        {detailRecord && (
+          <div className="space-y-6">
+            {detailRecord.sourceWarnings?.length > 0 && (
+              <Alert
+                type="warning"
+                showIcon
+                message="Cảnh báo dữ liệu nguồn"
+                description={
+                  <ul className="list-disc list-inside text-xs space-y-1 mt-1">
+                    {detailRecord.sourceWarnings.map((w: string, idx: number) => (
+                      <li key={idx}>{w}</li>
+                    ))}
+                  </ul>
+                }
+              />
+            )}
+
+            {/* Thông tin nhân thân */}
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 border-b pb-1">
+                1. Thông tin cá nhân &amp; Định danh
+              </h4>
+              <Descriptions column={{ xs: 1, sm: 2 }} size="small" bordered>
+                <Descriptions.Item label="Họ và tên">
+                  <strong>{detailRecord.sourceValues?.['Họ và tên'] || detailRecord.fullName || '—'}</strong>
+                </Descriptions.Item>
+                <Descriptions.Item label="Số CCCD">
+                  <span className="font-mono">{detailRecord.sourceValues?.['Số CCCD'] || detailRecord.idCard || '—'}</span>
+                </Descriptions.Item>
+                <Descriptions.Item label="Số điện thoại">
+                  <span className="font-mono">{detailRecord.sourceValues?.['SĐT'] || detailRecord.phone || '—'}</span>
+                </Descriptions.Item>
+                <Descriptions.Item label="Ngày sinh">
+                  {detailRecord.sourceValues?.['Ngày sinh'] || detailRecord.dob || '—'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Giới tính">
+                  {detailRecord.sourceValues?.['Giới tính'] || detailRecord.gender || '—'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Ngày cấp CCCD">
+                  {detailRecord.sourceValues?.['Ngày cấp'] || detailRecord.idCardDate || '—'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Địa chỉ / Quê quán" span={2}>
+                  {detailRecord.sourceValues?.['Địa chỉ'] || detailRecord.address || '—'}
+                </Descriptions.Item>
+              </Descriptions>
+            </div>
+
+            {/* Tuyển dụng & Đào tạo */}
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 border-b pb-1">
+                2. Tuyển dụng &amp; Đào tạo
+              </h4>
+              <Descriptions column={{ xs: 1, sm: 2 }} size="small" bordered>
+                <Descriptions.Item label="Nhà máy PV">
+                  {detailRecord.sourceValues?.['Nhà máy PV'] || '—'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Ngày phỏng vấn">
+                  {detailRecord.sourceValues?.['Ngày PV'] || '—'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Chuyên viên tuyển dụng">
+                  {detailRecord.sourceValues?.['Tuyển dụng'] || '—'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Đón xe + KTX">
+                  {detailRecord.sourceValues?.['Đón xe + KTX'] || '—'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Tình trạng đào tạo">
+                  {detailRecord.sourceValues?.['Tình trạng đào tạo'] || '—'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Ngày ĐT dự kiến">
+                  {detailRecord.sourceValues?.['Ngày Đào tạo dự kiến'] || '—'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Ngày ĐT chuẩn" span={2}>
+                  {detailRecord.sourceValues?.['Ngày đào tạo chuẩn'] || '—'}
+                </Descriptions.Item>
+              </Descriptions>
+            </div>
+
+            {/* Làm việc & Biến động */}
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 border-b pb-1">
+                3. Quá trình làm việc &amp; Nghỉ việc
+              </h4>
+              <Descriptions column={{ xs: 1, sm: 2 }} size="small" bordered>
+                <Descriptions.Item label="Nhà máy làm việc">
+                  {detailRecord.sourceValues?.['Nhà máy làm việc'] || '—'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Mã nhân viên">
+                  <span className="font-mono">{detailRecord.sourceValues?.['Mã NV'] || '—'}</span>
+                </Descriptions.Item>
+                <Descriptions.Item label="Loại hợp đồng">
+                  {detailRecord.sourceValues?.['Loại HĐ'] ||
+                    detailRecord.sourceValues?.['Loại HD'] ||
+                    detailRecord.assignments?.[0]?.contractType ||
+                    '—'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Tháng nhận việc">
+                  <span className="font-semibold">{detailRecord.sourceValues?.['Tháng nhận việc'] || '—'}</span>
+                </Descriptions.Item>
+                <Descriptions.Item label="Tình trạng">
+                  {getStatusTag(detailRecord.sourceValues?.['Tình trạng'])}
+                </Descriptions.Item>
+                <Descriptions.Item label="Ngày nghỉ việc (Ngày NH)">
+                  <span className="text-rose-600 font-medium">
+                    {detailRecord.sourceValues?.['Ngày NH'] || '—'}
+                  </span>
+                </Descriptions.Item>
+                <Descriptions.Item label="Lý do nghỉ việc" span={2}>
+                  {detailRecord.sourceValues?.['Lý do'] || '—'}
+                </Descriptions.Item>
+              </Descriptions>
+            </div>
+
+            {/* Dữ liệu Thưởng đối chiếu nếu có */}
+            {detailRecord.rewardSource?.length > 0 && (
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 border-b pb-1">
+                  4. Dữ liệu thưởng đối chiếu từ Excel ({detailRecord.rewardSource.length} dòng)
+                </h4>
+                <Table
+                  size="small"
+                  pagination={false}
+                  rowKey="id"
+                  dataSource={detailRecord.rewardSource}
+                  columns={[
+                    { title: 'Công ty', dataIndex: ['values', 'Công ty'], key: 'co' },
+                    { title: 'Ngày PV', dataIndex: ['values', 'Ngày PV'], key: 'pv' },
+                    { title: 'Chính sách', dataIndex: ['values', 'Chính sách'], key: 'po' },
+                    {
+                      title: 'Các mốc thưởng',
+                      key: 'bonuses',
+                      render: (_: any, r: any) => {
+                        const items = Array.from({ length: 7 }, (_, i) => r.values?.[`Thưởng lần ${i + 1}`])
+                          .filter(Boolean);
+                        return items.length ? items.join(' · ') : '—';
+                      },
+                    },
+                  ]}
+                />
+              </div>
+            )}
+
+            {/* Thao tác */}
+            <div className="flex gap-2 pt-4 border-t">
+              <Button
+                type="primary"
+                icon={<Edit3 className="w-4 h-4" />}
+                onClick={() => {
+                  handleOpenStatusModal(detailRecord);
+                }}
+              >
+                Cập nhật trạng thái
+              </Button>
+              <Button
+                icon={<Building className="w-4 h-4" />}
+                onClick={() => {
+                  handleOpenHistory(detailRecord);
+                }}
+              >
+                Xem lịch sử công ty
+              </Button>
+            </div>
+          </div>
+        )}
+      </Drawer>
+
+      {/* Modal Lịch Sử Đa Công Ty */}
       <Modal
         title={
           <div className="flex items-center justify-between pr-8">
@@ -309,7 +905,7 @@ export default function WorkersPage() {
             <div className="flex gap-2">
               <Button onClick={() => setHistoryWorker(null)}>Đóng</Button>
               <Button type="primary" href={`/workers/${historyWorker?.id}`}>
-                Xem chi tiết hồ sơ & mốc thưởng →
+                Xem chi tiết hồ sơ &amp; mốc thưởng →
               </Button>
             </div>
           </div>
@@ -318,10 +914,18 @@ export default function WorkersPage() {
       >
         <div className="space-y-4 my-2">
           <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-xs flex flex-wrap gap-4 text-slate-700">
-            <span>Họ và tên: <strong className="text-slate-900">{historyWorker?.fullName}</strong></span>
-            <span>CCCD: <strong className="font-mono text-blue-800">{historyWorker?.idCard}</strong></span>
-            <span>SĐT: <strong className="font-mono text-slate-800">{historyWorker?.phone || '—'}</strong></span>
-            <span>Quê quán: <strong className="text-slate-800">{historyWorker?.province || '—'}</strong></span>
+            <span>
+              Họ và tên: <strong className="text-slate-900">{historyWorker?.fullName}</strong>
+            </span>
+            <span>
+              CCCD: <strong className="font-mono text-blue-800">{historyWorker?.idCard}</strong>
+            </span>
+            <span>
+              SĐT: <strong className="font-mono text-slate-800">{historyWorker?.phone || '—'}</strong>
+            </span>
+            <span>
+              Quê quán: <strong className="text-slate-800">{historyWorker?.province || '—'}</strong>
+            </span>
           </div>
 
           <Table
@@ -330,7 +934,8 @@ export default function WorkersPage() {
             dataSource={historyWorker?.assignments || []}
             pagination={false}
             bordered
-            size="middle"
+            size="small"
+            locale={{ emptyText: 'Không có dòng phù hợp. Hãy kiểm tra bộ lọc hoặc chuyển nhóm hồ sơ.' }}
             columns={[
               {
                 title: 'STT',
@@ -354,10 +959,13 @@ export default function WorkersPage() {
                 key: 'timeline',
                 render: (_: any, a: any) => (
                   <div className="text-xs">
-                    <div>PV/Bắt đầu: <strong className="text-slate-700">{a.startDate || a.passedDate || a.interviewDate || '—'}</strong></div>
-                    {a.leaveDate && (
-                      <div className="text-rose-600 font-medium">Nghỉ: {a.leaveDate}</div>
-                    )}
+                    <div>
+                      PV/Bắt đầu:{' '}
+                      <strong className="text-slate-700">
+                        {a.startDate || a.passedDate || a.interviewDate || '—'}
+                      </strong>
+                    </div>
+                    {a.leaveDate && <div className="text-rose-600 font-medium">Nghỉ: {a.leaveDate}</div>}
                   </div>
                 ),
               },
@@ -366,7 +974,15 @@ export default function WorkersPage() {
                 key: 'status',
                 render: (_: any, a: any) => (
                   <div>
-                    <Tag color={a.status === 'Đang làm việc' ? 'success' : a.status === 'Đã nghỉ việc' ? 'error' : 'default'}>
+                    <Tag
+                      color={
+                        a.status === 'Đang làm việc'
+                          ? 'success'
+                          : a.status === 'Đã nghỉ việc'
+                          ? 'error'
+                          : 'default'
+                      }
+                    >
                       {a.status}
                     </Tag>
                     {a.leaveReason && (
@@ -379,12 +995,21 @@ export default function WorkersPage() {
                 title: 'Thưởng Đã Nhận',
                 key: 'bonus',
                 render: (_: any, a: any) => {
-                  const pTotal = (a.enrollments || []).reduce((sum: number, e: any) =>
-                    sum + (e.stages || []).reduce((sSum: number, s: any) =>
-                      sSum + (s.payments || []).reduce((pSum: number, p: any) => pSum + (p.amount || 0), 0)
-                    , 0)
-                  , 0);
-                  const bTotal = (a.bonusRecords || []).reduce((sum: number, b: any) => sum + (b.totalBonus || 0), 0);
+                  const pTotal = (a.enrollments || []).reduce(
+                    (sum: number, e: any) =>
+                      sum +
+                      (e.stages || []).reduce(
+                        (sSum: number, s: any) =>
+                          sSum +
+                          (s.payments || []).reduce((pSum: number, p: any) => pSum + (p.amount || 0), 0),
+                        0
+                      ),
+                    0
+                  );
+                  const bTotal = (a.bonusRecords || []).reduce(
+                    (sum: number, b: any) => sum + (b.totalBonus || 0),
+                    0
+                  );
                   const total = pTotal > 0 ? pTotal : bTotal;
                   return total > 0 ? (
                     <span className="font-bold text-emerald-700 text-xs">
@@ -405,71 +1030,135 @@ export default function WorkersPage() {
           />
         </div>
       </Modal>
+
       {/* Modal Thêm Mới Hồ Sơ */}
-      <Modal title={rehire ? "Tái tuyển dụng — giữ lịch sử hồ sơ" : "Thêm Mới Hồ Sơ Lao Động (DS_TONG)"} open={isAddModalOpen} onCancel={() => setIsAddModalOpen(false)} footer={null} width={700}>
-        <Form form={addForm} layout="vertical" onFinish={handleAddWorker} initialValues={{
+      <Modal
+        title={rehire ? 'Tái tuyển dụng — giữ lịch sử hồ sơ' : 'Thêm Mới Hồ Sơ Lao Động (DS_TONG)'}
+        open={isAddModalOpen}
+        onCancel={() => setIsAddModalOpen(false)}
+        footer={null}
+        width={700}
+      >
+        <Form
+          form={addForm}
+          layout="vertical"
+          onFinish={handleAddWorker}
+          initialValues={{
             interviewFactory: 'Luxshare QC',
             contractType: 'Thời vụ',
             status: 'Đang chờ phỏng vấn',
-        }} className="mt-4">
+          }}
+          className="mt-4"
+        >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Form.Item name="fullName" label="Họ và Tên" rules={[{ required: true, message: 'Vui lòng nhập Họ và Tên' }]}>
-              <Input placeholder="Nguyễn Văn A"/>
+            <Form.Item
+              name="fullName"
+              label="Họ và Tên"
+              rules={[{ required: true, message: 'Vui lòng nhập Họ và Tên' }]}
+            >
+              <Input placeholder="Nguyễn Văn A" />
             </Form.Item>
 
-            <Form.Item name="idCard" label="Số CCCD / CMT (Bắt buộc)" rules={[
-            { required: true, message: 'Vui lòng nhập số CCCD' },
-            { pattern: /^(\d{9}|\d{12})$/, message: 'CCCD 12 số hoặc CMT cũ 9 số' },
-        ]} extra="Hệ thống tự động chặn trùng CCCD với toàn bộ dữ liệu cũ">
-              <Input readOnly={rehire} placeholder="Nhập đầy đủ số căn cước"/>
+            <Form.Item
+              name="idCard"
+              label="Số CCCD / CMT (Bắt buộc)"
+              rules={[
+                { required: true, message: 'Vui lòng nhập số CCCD' },
+                { pattern: /^(\d{9}|\d{12})$/, message: 'CCCD 12 số hoặc CMT cũ 9 số' },
+              ]}
+              extra="Hệ thống tự động chặn trùng CCCD với toàn bộ dữ liệu cũ"
+            >
+              <Input readOnly={rehire} placeholder="Nhập đầy đủ số căn cước" />
             </Form.Item>
 
             <Form.Item name="phone" label="Số Điện Thoại">
-              <Input placeholder="0987654321"/>
+              <Input placeholder="0987654321" />
             </Form.Item>
 
             <Form.Item name="dob" label="Ngày Sinh">
-              <Input placeholder="15/04/1998"/>
+              <Input placeholder="15/04/1998" />
             </Form.Item>
 
             <Form.Item name="gender" label="Giới Tính">
-              <Select options={[
-            { label: 'Nam', value: 'Nam' },
-            { label: 'Nữ', value: 'Nữ' },
-        ]}/>
+              <Select
+                options={[
+                  { label: 'Nam', value: 'Nam' },
+                  { label: 'Nữ', value: 'Nữ' },
+                ]}
+              />
             </Form.Item>
 
             <Form.Item name="address" label="Địa Chỉ / Quê Quán">
-              <Input placeholder="Diễn Châu, Nghệ An"/>
+              <Input placeholder="Diễn Châu, Nghệ An" />
             </Form.Item>
 
             <Form.Item name="interviewFactory" label="Nhà Máy Phỏng Vấn">
-              <Select options={FACTORIES.map((f) => ({ label: f, value: f }))}/>
+              <Select options={FACTORIES.map((f) => ({ label: f, value: f }))} />
             </Form.Item>
 
             <Form.Item name="status" label="Tình Trạng">
-              <Select options={STATUSES.map(value=>({value,label:value}))}/>
+              <Select options={STATUSES.map((value) => ({ value, label: value }))} />
             </Form.Item>
 
             <Form.Item name="recruiter" label="Chuyên Viên Tuyển Dụng">
-              <Input placeholder="Nguyễn Thu Trang"/>
+              <Input placeholder="Nguyễn Thu Trang" />
             </Form.Item>
 
             <Form.Item name="source" label="Nguồn Tuyển Dụng">
-              <Input placeholder="Facebook, Zalo, Tự do..."/>
+              <Input placeholder="Facebook, Zalo, Tự do..." />
             </Form.Item>
 
             <Form.Item name="standardTrainingDate" label="Ngày Đào Tạo Chuẩn">
-              <Input placeholder="10/01/2026"/>
+              <Input placeholder="10/01/2026" />
             </Form.Item>
 
             <Form.Item name="onboardingMonth" label="Tháng Nhận Việc">
-              <Input placeholder="T10.2026"/>
+              <Input placeholder="T10.2026" />
             </Form.Item>
-            {['code', 'idCardDate', 'idCardPlace', 'province', 'team', 'workingFactory', 'contractType', 'shuttleBusKtx', 'interviewDate', 'expectedTrainingDate', 'expectedTrainingStatus', 'leaveDate', 'leaveReason'].map((name) => <Form.Item key={name} name={name} label={({ code: 'Mã NV', idCardDate: 'Ngày cấp', idCardPlace: 'Nơi cấp', province: 'Tỉnh/Thành', team: 'Đội nhóm', workingFactory: 'Nhà máy làm việc', contractType: 'Loại hợp đồng', shuttleBusKtx: 'Đón xe / KTX', interviewDate: 'Ngày PV', expectedTrainingDate: 'Ngày đào tạo dự kiến', expectedTrainingStatus: 'Tình trạng đào tạo', leaveDate: 'Ngày nghỉ (nếu đã nghỉ)', leaveReason: 'Lý do nghỉ (nếu đã nghỉ)' } as Record<string, string>)[name]}><Input /></Form.Item>)}
+            {[
+              'code',
+              'idCardDate',
+              'idCardPlace',
+              'province',
+              'team',
+              'workingFactory',
+              'contractType',
+              'shuttleBusKtx',
+              'interviewDate',
+              'expectedTrainingDate',
+              'expectedTrainingStatus',
+              'leaveDate',
+              'leaveReason',
+            ].map((name) => (
+              <Form.Item
+                key={name}
+                name={name}
+                label={
+                  (
+                    {
+                      code: 'Mã NV',
+                      idCardDate: 'Ngày cấp',
+                      idCardPlace: 'Nơi cấp',
+                      province: 'Tỉnh/Thành',
+                      team: 'Đội nhóm',
+                      workingFactory: 'Nhà máy làm việc',
+                      contractType: 'Loại hợp đồng',
+                      shuttleBusKtx: 'Đón xe / KTX',
+                      interviewDate: 'Ngày PV',
+                      expectedTrainingDate: 'Ngày đào tạo dự kiến',
+                      expectedTrainingStatus: 'Tình trạng đào tạo',
+                      leaveDate: 'Ngày nghỉ (nếu đã nghỉ)',
+                      leaveReason: 'Lý do nghỉ (nếu đã nghỉ)',
+                    } as Record<string, string>
+                  )[name]
+                }
+              >
+                <Input />
+              </Form.Item>
+            ))}
           </div>
 
-          <AssignmentFields form={addForm}/>
+          <AssignmentFields form={addForm} />
           <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
             <Button onClick={() => setIsAddModalOpen(false)}>Hủy</Button>
             <Button type="primary" htmlType="submit" loading={submitting}>
@@ -480,31 +1169,82 @@ export default function WorkersPage() {
       </Modal>
 
       {/* Modal Cập Nhật Trạng Thái & Báo Nghỉ Việc */}
-      <Modal title={`Cập Nhật Trạng Thái: ${selectedWorker?.fullName}`} open={isStatusModalOpen} onCancel={() => setIsStatusModalOpen(false)} footer={null}>
+      <Modal
+        title={`Cập Nhật Trạng Thái: ${selectedWorker?.fullName}`}
+        open={isStatusModalOpen}
+        onCancel={() => setIsStatusModalOpen(false)}
+        footer={null}
+      >
         <Form form={statusForm} layout="vertical" onFinish={handleUpdateStatus} className="mt-4">
-          <AssignmentFields form={statusForm} showWorkDays/>
-          <div className="grid grid-cols-2 gap-3">{Object.entries({ fullName: 'Họ tên', phone: 'SĐT', dob: 'Ngày sinh', gender: 'Giới tính', code: 'Mã NV', idCardDate: 'Ngày cấp', idCardPlace: 'Nơi cấp', address: 'Địa chỉ', province: 'Tỉnh/Thành', team: 'Đội nhóm', recruiter: 'Tuyển dụng', source: 'Nguồn', interviewFactory: 'Nhà máy PV', workingFactory: 'Nhà máy làm việc', contractType: 'Loại hợp đồng', shuttleBusKtx: 'Đón xe / KTX', interviewDate: 'Ngày PV', expectedTrainingDate: 'Ngày đào tạo dự kiến', expectedTrainingStatus: 'Tình trạng đào tạo dự kiến', standardTrainingDate: 'Ngày đào tạo chuẩn', onboardingMonth: 'Tháng nhận việc' }).map(([name, label]) => <Form.Item key={name} name={name} label={label}><Input /></Form.Item>)}</div>
+          <AssignmentFields form={statusForm} showWorkDays />
+          <div className="grid grid-cols-2 gap-3">
+            {Object.entries({
+              fullName: 'Họ tên',
+              phone: 'SĐT',
+              dob: 'Ngày sinh',
+              gender: 'Giới tính',
+              code: 'Mã NV',
+              idCardDate: 'Ngày cấp',
+              idCardPlace: 'Nơi cấp',
+              address: 'Địa chỉ',
+              province: 'Tỉnh/Thành',
+              team: 'Đội nhóm',
+              recruiter: 'Tuyển dụng',
+              source: 'Nguồn',
+              interviewFactory: 'Nhà máy PV',
+              workingFactory: 'Nhà máy làm việc',
+              contractType: 'Loại hợp đồng',
+              shuttleBusKtx: 'Đón xe / KTX',
+              interviewDate: 'Ngày PV',
+              expectedTrainingDate: 'Ngày đào tạo dự kiến',
+              expectedTrainingStatus: 'Tình trạng đào tạo dự kiến',
+              standardTrainingDate: 'Ngày đào tạo chuẩn',
+              onboardingMonth: 'Tháng nhận việc',
+            }).map(([name, label]) => (
+              <Form.Item key={name} name={name} label={label}>
+                <Input />
+              </Form.Item>
+            ))}
+          </div>
           <Form.Item name="status" label="Tình Trạng Làm Việc">
-            <Select options={STATUSES.map(value=>({value,label:value}))}/>
+            <Select options={STATUSES.map((value) => ({ value, label: value }))} />
           </Form.Item>
 
-          <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}>
-            {({ getFieldValue }) => getFieldValue('status') === 'Đã nghỉ việc' ? (<>
-                  <Form.Item name="leaveDate" label="Ngày NH (Ngày Nghỉ Việc)" rules={[{ required: true, message: 'Vui lòng nhập Ngày nghỉ việc' }]} extra="Ghi nhận ngày làm việc cuối cùng tại xưởng">
-                    <Input placeholder="VD: 25/01/2026"/>
+          <Form.Item
+            noStyle
+            shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}
+          >
+            {({ getFieldValue }) =>
+              getFieldValue('status') === 'Đã nghỉ việc' ? (
+                <>
+                  <Form.Item
+                    name="leaveDate"
+                    label="Ngày NH (Ngày Nghỉ Việc)"
+                    rules={[{ required: true, message: 'Vui lòng nhập Ngày nghỉ việc' }]}
+                    extra="Ghi nhận ngày làm việc cuối cùng tại xưởng"
+                  >
+                    <Input placeholder="VD: 25/01/2026" />
                   </Form.Item>
 
-                  <Form.Item name="leaveReason" label="Lý Do Nghỉ Việc" rules={[{ required: true, message: 'Vui lòng nhập lý do nghỉ việc' }]}>
-                    <Select options={[
-                { label: 'Việc gia đình', value: 'Việc gia đình' },
-                { label: 'Lương thưởng không phù hợp', value: 'Lương thưởng không phù hợp' },
-                { label: 'Sức khỏe không đảm bảo', value: 'Sức khỏe không đảm bảo' },
-                { label: 'Vi phạm kỷ luật / Tự ý bỏ việc', value: 'Vi phạm kỷ luật' },
-                { label: 'Hết hạn hợp đồng', value: 'Hết hạn hợp đồng' },
-                { label: 'Khác', value: 'Khác' },
-            ]}/>
+                  <Form.Item
+                    name="leaveReason"
+                    label="Lý Do Nghỉ Việc"
+                    rules={[{ required: true, message: 'Vui lòng nhập lý do nghỉ việc' }]}
+                  >
+                    <Select
+                      options={[
+                        { label: 'Việc gia đình', value: 'Việc gia đình' },
+                        { label: 'Lương thưởng không phù hợp', value: 'Lương thưởng không phù hợp' },
+                        { label: 'Sức khỏe không đảm bảo', value: 'Sức khỏe không đảm bảo' },
+                        { label: 'Vi phạm kỷ luật / Tự ý bỏ việc', value: 'Vi phạm kỷ luật' },
+                        { label: 'Hết hạn hợp đồng', value: 'Hết hạn hợp đồng' },
+                        { label: 'Khác', value: 'Khác' },
+                      ]}
+                    />
                   </Form.Item>
-                </>) : null}
+                </>
+              ) : null
+            }
           </Form.Item>
 
           <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
@@ -515,5 +1255,6 @@ export default function WorkersPage() {
           </div>
         </Form>
       </Modal>
-    </div>);
+    </div>
+  );
 }
