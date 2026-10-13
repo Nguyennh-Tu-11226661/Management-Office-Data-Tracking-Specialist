@@ -1,4 +1,6 @@
 'use client';
+import AssignmentFields from '@/components/AssignmentFields';
+import {STATUSES} from '@/lib/worker-validation';
 import { useIdentity } from '@/components/AuthGate';
 import React, { useEffect, useState } from 'react';
 import { Table, Button, Input, Select, Tag, Modal, Form, message, Popconfirm, Badge, Card, Space } from 'antd';
@@ -17,12 +19,18 @@ const FACTORIES = [
 export default function WorkersPage() {
     const user = useIdentity();
     const canWrite = user?.permissions.includes('worker:write');
+    const [archived,setArchived]=useState(false);
+    const [month,setMonth]=useState('');
+    const [activeConfirm,setActiveConfirm]=useState(false);
     const [rehire, setRehire] = useState(false);
     const [historyWorker, setHistoryWorker] = useState<any>(null);
+    const [historyLoading, setHistoryLoading] = useState(false);
     const [workers, setWorkers] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
     const [factoryFilter, setFactoryFilter] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     const [statusFilter, setStatusFilter] = useState('');
     // Modal thêm mới
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -35,7 +43,7 @@ export default function WorkersPage() {
     const fetchWorkers = async () => {
         try {
             setLoading(true);
-            const params = new URLSearchParams();
+            const params = new URLSearchParams({archived:String(archived),month});
             if (search)
                 params.append('search', search);
             if (factoryFilter)
@@ -56,9 +64,11 @@ export default function WorkersPage() {
         }
     };
     useEffect(() => {
+        setCurrentPage(1);
         fetchWorkers();
-    }, [factoryFilter, statusFilter]);
+    }, [factoryFilter, statusFilter,archived,month]);
     const handleSearch = () => {
+        setCurrentPage(1);
         fetchWorkers();
     };
     // Xử lý thêm mới hồ sơ
@@ -68,7 +78,7 @@ export default function WorkersPage() {
             const res = await fetch('/api/workers', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...values, rehire }),
+                body: JSON.stringify({ ...values, rehire,confirmActiveDuplicate:activeConfirm }),
             });
             const json = await res.json();
             if (json.success) {
@@ -78,7 +88,9 @@ export default function WorkersPage() {
                 fetchWorkers();
             }
             else {
-                if (json.duplicateType === 'PHONE') {
+                if (json.duplicateType === 'ACTIVE_LABOR') {
+                    Modal.confirm({title:'CCCD đang làm/chưa đào tạo',content:json.message,onOk:async()=>{const response=await fetch('/api/workers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...values,rehire:true,confirmActiveDuplicate:true})});const result=await response.json();if(!result.success){message.error(result.message);throw new Error(result.message);}setIsAddModalOpen(false);fetchWorkers();}});
+                } else if (json.duplicateType === 'PHONE') {
                     Modal.confirm({ title: 'Xác nhận dùng chung SĐT sau khi xác minh', content: json.message, onOk: async () => {
                             const response = await fetch('/api/workers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...values, rehire, confirmPhoneDuplicate: true }) });
                             const result = await response.json();
@@ -149,102 +161,246 @@ export default function WorkersPage() {
             message.error('Lỗi cập nhật');
         }
     };
+
+    const handleOpenHistory = async (record: any) => {
+        try {
+            setHistoryLoading(true);
+            setHistoryWorker(record);
+            const res = await fetch(`/api/worker-history?id=${record.id}`);
+            const json = await res.json();
+            if (json.success && json.data?.[0]) {
+                setHistoryWorker(json.data[0]);
+            }
+        } catch {
+            // Giữ record hiện tại
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
     const columns = [
         {
             title: 'STT',
             key: 'stt',
-            width: 60,
+            width: 55,
+            fixed: 'left' as const,
             align: 'center' as const,
-            render: (_: any, __: any, index: number) => index + 1,
-        },
-        {
-            title: 'Họ và Tên',
-            dataIndex: 'fullName',
-            key: 'fullName',
-            render: (text: string, record: any) => (<div>
-          <span className="font-bold text-slate-800">{text}</span>
-          <div className="text-[11px] text-slate-500 flex items-center gap-2">
-            <span>{record.gender || 'N/A'}</span> • <span>{record.dob || 'N/A'}</span>
-          </div>
-        </div>),
-        },
-        {
-            title: 'Số CCCD',
-            dataIndex: 'idCard',
-            key: 'idCard',
-            render: (text: string) => (<span className="font-mono text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-          {text}
-        </span>),
-        },
-        {
-            title: 'Số Điện Thoại',
-            dataIndex: 'phone',
-            key: 'phone',
-            render: (text: string) => <span className="text-xs font-medium text-slate-600">{text || 'N/A'}</span>,
+            render: (_: any, __: any, index: number) => (currentPage - 1) * pageSize + index + 1,
         },
         {
             title: 'Nhà Máy PV',
-            key: 'factory',
+            key: 'interviewFactory',
+            width: 140,
             render: (_: any, record: any) => {
                 const a = record.assignments[0];
-                return (<span className="font-medium text-slate-700 flex items-center gap-1.5 text-xs">
-            <Building className="w-3.5 h-3.5 text-slate-400"/>
-            {a?.interviewFactory || 'N/A'}
-          </span>);
+                return (
+                    <span className="font-semibold text-slate-800 flex items-center gap-1.5 text-xs">
+                        <Building className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        {a?.interviewFactory || '—'}
+                    </span>
+                );
+            },
+        },
+        {
+            title: 'Nhà Máy Làm Việc',
+            key: 'workingFactory',
+            width: 140,
+            render: (_: any, record: any) => {
+                const a = record.assignments[0];
+                return <span className="text-xs text-slate-700">{a?.workingFactory || a?.interviewFactory || '—'}</span>;
+            },
+        },
+        {
+            title: 'Loại HĐ',
+            key: 'contractType',
+            width: 100,
+            render: (_: any, record: any) => {
+                const a = record.assignments[0];
+                return <Tag color="blue" className="text-xs">{a?.contractType || 'Thời vụ'}</Tag>;
             },
         },
         {
             title: 'Tình Trạng (Còn LV / Nghỉ)',
             key: 'status',
+            width: 140,
             render: (_: any, record: any) => {
                 const a = record.assignments[0];
                 const status = a?.status || 'Chưa rõ';
-                if (status === 'Đang làm việc') {
-                    return <Tag color="success">Còn LV</Tag>;
-                }
-                if (status === 'Đã nghỉ việc') {
-                    return (<div>
-              <Tag color="error">Đã nghỉ việc</Tag>
-              {a?.leaveDate && (<div className="text-[10px] text-rose-500 mt-0.5">Ngày NH: {a.leaveDate}</div>)}
-            </div>);
-                }
-                if (status === 'Đạt phỏng vấn') {
-                    return <Tag color="processing">Đạt PV</Tag>;
-                }
+                if (status === 'Đang làm việc') return <Tag color="success">Còn LV</Tag>;
+                if (status === 'Đã nghỉ việc') return <Tag color="error">Đã nghỉ việc</Tag>;
+                if (status === 'Đạt phỏng vấn') return <Tag color="processing">Đạt PV</Tag>;
                 return <Tag color="default">{status}</Tag>;
+            },
+        },
+        {
+            title: 'Ngày NH (Nghỉ việc)',
+            key: 'leaveDate',
+            width: 120,
+            render: (_: any, record: any) => {
+                const a = record.assignments[0];
+                return a?.leaveDate ? <span className="text-xs font-semibold text-rose-600">{a.leaveDate}</span> : <span className="text-slate-400">—</span>;
             },
         },
         {
             title: 'Lý Do Nghỉ',
             key: 'leaveReason',
+            width: 150,
             render: (_: any, record: any) => {
                 const a = record.assignments[0];
-                return <span className="text-xs text-slate-500">{a?.leaveReason || '-'}</span>;
+                return <span className="text-xs text-slate-600">{a?.leaveReason || '—'}</span>;
             },
         },
         {
-            title: 'Ngày Đào Tạo',
-            key: 'standardTrainingDate',
-            render: (_: any, record: any) => {
-                const a = record.assignments[0];
-                return <span className="text-xs text-slate-600">{a?.standardTrainingDate || a?.interviewDate || '-'}</span>;
-            },
+            title: 'Mã NV',
+            key: 'code',
+            width: 90,
+            render: (_: any, record: any) => <span className="font-mono text-xs text-slate-700">{record.code || record.assignments[0]?.employeeCode || '—'}</span>,
         },
         {
-            title: 'Tuyển Dụng (Recruiter)',
-            dataIndex: 'recruiter',
+            title: 'Họ và Tên',
+            dataIndex: 'fullName',
+            key: 'fullName',
+            width: 180,
+            fixed: 'left' as const,
+            render: (text: string, record: any) => (
+                <div>
+                    <span className="font-bold text-slate-900">{text}</span>
+                    <div className="text-[11px] text-slate-500">
+                        {record.gender || '—'} · {record.dob || '—'}
+                    </div>
+                </div>
+            ),
+        },
+        {
+            title: 'Ngày Sinh',
+            dataIndex: 'dob',
+            key: 'dob',
+            width: 100,
+            render: (text: string) => <span className="text-xs text-slate-600">{text || '—'}</span>,
+        },
+        {
+            title: 'Giới Tính',
+            dataIndex: 'gender',
+            key: 'gender',
+            width: 80,
+            render: (text: string) => <span className="text-xs text-slate-600">{text || '—'}</span>,
+        },
+        {
+            title: 'Số CCCD',
+            dataIndex: 'idCard',
+            key: 'idCard',
+            width: 130,
+            render: (text: string) => (
+                <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                    {text}
+                </span>
+            ),
+        },
+        {
+            title: 'Ngày Cấp CCCD',
+            dataIndex: 'idCardDate',
+            key: 'idCardDate',
+            width: 110,
+            render: (text: string) => <span className="text-xs text-slate-600">{text || '—'}</span>,
+        },
+        {
+            title: 'Địa Chỉ / Quê Quán',
+            key: 'address',
+            width: 150,
+            render: (_: any, record: any) => <span className="text-xs text-slate-600">{record.province || record.address || '—'}</span>,
+        },
+        {
+            title: 'Số Điện Thoại',
+            dataIndex: 'phone',
+            key: 'phone',
+            width: 120,
+            render: (text: string) => <span className="text-xs font-medium text-slate-700">{text || '—'}</span>,
+        },
+        {
+            title: 'Tuyển Dụng',
             key: 'recruiter',
-            render: (text: string) => <span className="text-xs font-semibold text-slate-700">{text || '-'}</span>,
+            width: 140,
+            render: (_: any, record: any) => {
+                const a = record.assignments[0];
+                return <span className="text-xs font-semibold text-slate-700">{a?.recruiter || record.recruiter || '—'}</span>;
+            },
+        },
+        {
+            title: 'Đón Xe - KTX',
+            key: 'shuttleBusKtx',
+            width: 120,
+            render: (_: any, record: any) => {
+                const a = record.assignments[0];
+                return <span className="text-xs text-slate-600">{a?.shuttleBusKtx || '—'}</span>;
+            },
+        },
+        {
+            title: 'Ngày PV',
+            key: 'interviewDate',
+            width: 110,
+            render: (_: any, record: any) => {
+                const a = record.assignments[0];
+                return <span className="text-xs text-slate-700">{a?.interviewDate || '—'}</span>;
+            },
+        },
+        {
+            title: 'Ngày Đào Tạo Dự Kiến',
+            key: 'expectedTrainingDate',
+            width: 140,
+            render: (_: any, record: any) => {
+                const a = record.assignments[0];
+                return <span className="text-xs text-slate-600">{a?.expectedTrainingDate || '—'}</span>;
+            },
+        },
+        {
+            title: 'Tình Trạng ĐT Dự Kiến',
+            key: 'expectedTrainingStatus',
+            width: 140,
+            render: (_: any, record: any) => {
+                const a = record.assignments[0];
+                return <span className="text-xs text-slate-600">{a?.expectedTrainingStatus || '—'}</span>;
+            },
+        },
+        {
+            title: 'Ngày Đào Tạo Chuẩn',
+            key: 'standardTrainingDate',
+            width: 130,
+            render: (_: any, record: any) => {
+                const a = record.assignments[0];
+                return <span className="text-xs text-slate-600">{a?.standardTrainingDate || '—'}</span>;
+            },
+        },
+        {
+            title: 'Tháng Nhận Việc',
+            key: 'onboardingMonth',
+            width: 120,
+            render: (_: any, record: any) => {
+                const a = record.assignments[0];
+                return <span className="text-xs font-semibold text-slate-700">{a?.onboardingMonth || '—'}</span>;
+            },
+        },
+        {
+            title: 'Nguồn',
+            key: 'source',
+            width: 110,
+            render: (_: any, record: any) => {
+                const a = record.assignments[0];
+                return <span className="text-xs text-slate-500">{a?.source || record.source || '—'}</span>;
+            },
         },
         {
             title: 'Thao Tác',
             key: 'actions',
-            width: 230,
+            width: 270,
+            fixed: 'right' as const,
             render: (_: any, record: any) => (<Space size="small">
           <Button size="small" type="text" icon={<Edit3 className="w-3.5 h-3.5 text-blue-600"/>} disabled={!canWrite} onClick={() => handleOpenStatusModal(record)} title="Đổi trạng thái / Báo nghỉ việc"/>
-          <Button size="small" onClick={() => setHistoryWorker(record)}>Lịch sử</Button>
-          {record.assignments?.[0]?.status === 'Đã nghỉ việc' && <Button size="small" disabled={!canWrite} onClick={() => { setRehire(true); addForm.resetFields(); addForm.setFieldsValue({ ...record, status: 'Đang chờ phỏng vấn', interviewFactory: record.assignments[0]?.interviewFactory, workingFactory: '', onboardingMonth: '', interviewDate: '', standardTrainingDate: '' }); setIsAddModalOpen(true); }}>Tái tuyển</Button>}
-
+          <Button size="small" onClick={() => handleOpenHistory(record)} title="Xem toàn bộ lịch sử các công ty đã làm việc" className="text-blue-600 font-medium">
+            Lịch sử ({record.assignments?.length || 1})
+          </Button>
+          <a href={`/workers/${record.id}`} className="text-xs text-slate-600 hover:text-blue-600 font-medium">Chi tiết</a>
+          <Button size="small" disabled={!canWrite} onClick={async()=>{if(!window.confirm(archived?'Khôi phục hồ sơ này?':'Lưu trữ hồ sơ này và giữ toàn bộ lịch sử?'))return;const j=await (await fetch(`/api/workers/${record.id}`,{method:archived?'PATCH':'DELETE'})).json();if(j.success)fetchWorkers();else message.error(j.message);}}>{archived?'Khôi phục':'Lưu trữ'}</Button>
+          {!['Đang làm việc','Chưa đào tạo'].includes(record.assignments?.[0]?.status) && <Button size="small" disabled={!canWrite} onClick={() => { setRehire(true); addForm.resetFields(); addForm.setFieldsValue({ ...record, status: 'Đang chờ phỏng vấn', interviewFactory: record.assignments[0]?.interviewFactory, workingFactory: '', onboardingMonth: '', interviewDate: '', standardTrainingDate: '' }); setIsAddModalOpen(true); }}>Tái tuyển</Button>}
         </Space>),
         },
     ];
@@ -260,6 +416,7 @@ export default function WorkersPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Input type="month" value={month} onChange={e=>setMonth(e.target.value)} className="w-40" placeholder="Lọc theo tháng"/>
           <a href="/api/excel-engine/export?type=WORKERS">
             <Button icon={<Download className="w-4 h-4"/>}>Xuất Excel DS_TONG</Button>
           </a>
@@ -278,12 +435,7 @@ export default function WorkersPage() {
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <Input placeholder="Tìm theo Họ tên, CCCD, SĐT, Tuyển dụng..." prefix={<Search className="w-4 h-4 text-slate-400"/>} value={search} onChange={(e) => setSearch(e.target.value)} onPressEnter={handleSearch} allowClear/>
           <Select placeholder="Lọc theo Nhà máy phỏng vấn" allowClear value={factoryFilter || undefined} onChange={(val) => setFactoryFilter(val || '')} options={FACTORIES.map((f) => ({ label: f, value: f }))}/>
-          <Select placeholder="Lọc theo Tình trạng" allowClear value={statusFilter || undefined} onChange={(val) => setStatusFilter(val || '')} options={[
-            { label: 'Đang làm việc (Còn LV)', value: 'Đang làm việc' },
-            { label: 'Đã nghỉ việc', value: 'Đã nghỉ việc' },
-            { label: 'Đạt phỏng vấn', value: 'Đạt phỏng vấn' },
-            { label: 'Đang chờ phỏng vấn', value: 'Đang chờ phỏng vấn' },
-        ]}/>
+          <Select placeholder="Lọc theo Tình trạng" allowClear value={statusFilter || undefined} onChange={(val) => setStatusFilter(val || '')} options={STATUSES.map(value=>({value,label:value}))}/>
           <Button type="default" onClick={handleSearch} icon={<Filter className="w-4 h-4"/>}>
             Áp Dụng Bộ Lọc
           </Button>
@@ -292,11 +444,174 @@ export default function WorkersPage() {
 
       {/* Data Table */}
       <Card className="shadow-sm border-slate-200 overflow-hidden">
-        <Table columns={columns} dataSource={workers} rowKey="id" loading={loading} pagination={{ pageSize: 10, showSizeChanger: true }} bordered size="middle"/>
+        {/* Thanh chuyển đổi tab DS_TONG và Tháng cũ giống Excel */}
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3 mb-3 bg-slate-50 border border-slate-200 rounded-xl">
+          <div className="flex items-center gap-2">
+            <Button
+              type={!archived ? "primary" : "default"}
+              onClick={() => { setArchived(false); setCurrentPage(1); }}
+              className="font-bold text-xs"
+            >
+              📁 Tab `DS_TONG` (Hồ Sơ Hiện Hành)
+            </Button>
+            <Button
+              type={archived ? "primary" : "default"}
+              onClick={() => { setArchived(true); setCurrentPage(1); }}
+              className="font-bold text-xs"
+            >
+              🗂️ Tab `Tháng Cũ` (Hồ Sơ Lưu Trữ)
+            </Button>
+            <a href="/duplicates">
+              <Button type="default" danger className="font-semibold text-xs">
+                ⚠️ Tab `Cảnh Báo Trùng Lặp`
+              </Button>
+            </a>
+          </div>
+
+          <div className="text-xs text-slate-500 font-medium">
+            * Bảng hiển thị đầy đủ <strong>22 cột dữ liệu</strong> chuẩn theo mẫu Excel DS_TONG (Cuộn ngang để xem hết các cột)
+          </div>
+        </div>
+
+        <Table
+          columns={columns}
+          dataSource={workers}
+          rowKey="id"
+          loading={loading}
+          scroll={{ x: 2800 }}
+          pagination={{
+            current: currentPage,
+            pageSize: pageSize,
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100', '200'],
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size);
+            },
+            showTotal: (total, range) => `${range[0]} - ${range[1]} / ${total} hồ sơ`,
+          }}
+          bordered
+          size="middle"
+        />
       </Card>
 
-      <Modal title={`Lịch sử tuyển dụng: ${historyWorker?.fullName || ''}`} open={!!historyWorker} onCancel={() => setHistoryWorker(null)} footer={null} width={800}>
-        <Table rowKey="id" dataSource={historyWorker?.assignments || []} pagination={false} columns={[{ title: 'Ngày tạo đợt', dataIndex: 'createdAt', render: v => new Date(v).toLocaleString('vi-VN') }, { title: 'Nhà máy PV', dataIndex: 'interviewFactory' }, { title: 'Nhà máy làm việc', dataIndex: 'workingFactory' }, { title: 'Tình trạng', dataIndex: 'status' }, { title: 'Ngày nghỉ', dataIndex: 'leaveDate' }, { title: 'Lý do', dataIndex: 'leaveReason' }, { title: 'Tuyển dụng', dataIndex: 'recruiter' }]} scroll={{ x: 700 }}/>
+      <Modal
+        title={
+          <div className="flex items-center justify-between pr-8">
+            <div className="flex items-center gap-2">
+              <Building className="w-5 h-5 text-blue-600" />
+              <span className="text-base font-bold text-slate-900">
+                Lịch sử làm việc đa công ty: {historyWorker?.fullName}
+              </span>
+            </div>
+            <Tag color="blue" className="font-semibold text-xs">
+              {historyWorker?.assignments?.length || 0} công ty từng làm
+            </Tag>
+          </div>
+        }
+        open={!!historyWorker}
+        onCancel={() => setHistoryWorker(null)}
+        footer={
+          <div className="flex justify-between items-center pt-2">
+            <span className="text-xs text-slate-500 font-mono">CCCD: {historyWorker?.idCard}</span>
+            <div className="flex gap-2">
+              <Button onClick={() => setHistoryWorker(null)}>Đóng</Button>
+              <Button type="primary" href={`/workers/${historyWorker?.id}`}>
+                Xem chi tiết hồ sơ & mốc thưởng →
+              </Button>
+            </div>
+          </div>
+        }
+        width={950}
+      >
+        <div className="space-y-4 my-2">
+          <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-xs flex flex-wrap gap-4 text-slate-700">
+            <span>Họ và tên: <strong className="text-slate-900">{historyWorker?.fullName}</strong></span>
+            <span>CCCD: <strong className="font-mono text-blue-800">{historyWorker?.idCard}</strong></span>
+            <span>SĐT: <strong className="font-mono text-slate-800">{historyWorker?.phone || '—'}</strong></span>
+            <span>Quê quán: <strong className="text-slate-800">{historyWorker?.province || '—'}</strong></span>
+          </div>
+
+          <Table
+            rowKey="id"
+            loading={historyLoading}
+            dataSource={historyWorker?.assignments || []}
+            pagination={false}
+            bordered
+            size="middle"
+            columns={[
+              {
+                title: 'STT',
+                key: 'idx',
+                width: 50,
+                align: 'center' as const,
+                render: (_: any, __: any, index: number) => (historyWorker?.assignments?.length || 0) - index,
+              },
+              {
+                title: 'Công Ty / Nhà Máy',
+                key: 'factory',
+                render: (_: any, a: any) => (
+                  <div>
+                    <div className="font-bold text-slate-800">{a.workingFactory || a.interviewFactory}</div>
+                    <div className="text-[11px] text-slate-400">Đơn hàng: {a.order?.name || 'Mặc định'}</div>
+                  </div>
+                ),
+              },
+              {
+                title: 'Thời Gian Làm Việc',
+                key: 'timeline',
+                render: (_: any, a: any) => (
+                  <div className="text-xs">
+                    <div>PV/Bắt đầu: <strong className="text-slate-700">{a.startDate || a.passedDate || a.interviewDate || '—'}</strong></div>
+                    {a.leaveDate && (
+                      <div className="text-rose-600 font-medium">Nghỉ: {a.leaveDate}</div>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                title: 'Tình Trạng & Lý Do Nghỉ',
+                key: 'status',
+                render: (_: any, a: any) => (
+                  <div>
+                    <Tag color={a.status === 'Đang làm việc' ? 'success' : a.status === 'Đã nghỉ việc' ? 'error' : 'default'}>
+                      {a.status}
+                    </Tag>
+                    {a.leaveReason && (
+                      <div className="text-[11px] text-rose-600 mt-1">Lý do: {a.leaveReason}</div>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                title: 'Thưởng Đã Nhận',
+                key: 'bonus',
+                render: (_: any, a: any) => {
+                  const pTotal = (a.enrollments || []).reduce((sum: number, e: any) =>
+                    sum + (e.stages || []).reduce((sSum: number, s: any) =>
+                      sSum + (s.payments || []).reduce((pSum: number, p: any) => pSum + (p.amount || 0), 0)
+                    , 0)
+                  , 0);
+                  const bTotal = (a.bonusRecords || []).reduce((sum: number, b: any) => sum + (b.totalBonus || 0), 0);
+                  const total = pTotal > 0 ? pTotal : bTotal;
+                  return total > 0 ? (
+                    <span className="font-bold text-emerald-700 text-xs">
+                      {total.toLocaleString('vi-VN')} đ
+                    </span>
+                  ) : (
+                    <span className="text-slate-400 text-xs">—</span>
+                  );
+                },
+              },
+              {
+                title: 'Tuyển Dụng',
+                dataIndex: 'recruiter',
+                key: 'recruiter',
+                render: (text: string) => <span className="text-xs text-slate-600">{text || '—'}</span>,
+              },
+            ]}
+          />
+        </div>
       </Modal>
       {/* Modal Thêm Mới Hồ Sơ */}
       <Modal title={rehire ? "Tái tuyển dụng — giữ lịch sử hồ sơ" : "Thêm Mới Hồ Sơ Lao Động (DS_TONG)"} open={isAddModalOpen} onCancel={() => setIsAddModalOpen(false)} footer={null} width={700}>
@@ -341,12 +656,7 @@ export default function WorkersPage() {
             </Form.Item>
 
             <Form.Item name="status" label="Tình Trạng">
-              <Select options={[
-            { label: 'Đang làm việc (Còn LV)', value: 'Đang làm việc' },
-            { label: 'Đạt phỏng vấn', value: 'Đạt phỏng vấn' },
-            { label: 'Đang chờ phỏng vấn', value: 'Đang chờ phỏng vấn' },
-            { label: 'Đã nghỉ việc', value: 'Đã nghỉ việc' },
-        ]}/>
+              <Select options={STATUSES.map(value=>({value,label:value}))}/>
             </Form.Item>
 
             <Form.Item name="recruiter" label="Chuyên Viên Tuyển Dụng">
@@ -367,6 +677,7 @@ export default function WorkersPage() {
             {['code', 'idCardDate', 'idCardPlace', 'province', 'team', 'workingFactory', 'contractType', 'shuttleBusKtx', 'interviewDate', 'expectedTrainingDate', 'expectedTrainingStatus', 'leaveDate', 'leaveReason'].map((name) => <Form.Item key={name} name={name} label={({ code: 'Mã NV', idCardDate: 'Ngày cấp', idCardPlace: 'Nơi cấp', province: 'Tỉnh/Thành', team: 'Đội nhóm', workingFactory: 'Nhà máy làm việc', contractType: 'Loại hợp đồng', shuttleBusKtx: 'Đón xe / KTX', interviewDate: 'Ngày PV', expectedTrainingDate: 'Ngày đào tạo dự kiến', expectedTrainingStatus: 'Tình trạng đào tạo', leaveDate: 'Ngày nghỉ (nếu đã nghỉ)', leaveReason: 'Lý do nghỉ (nếu đã nghỉ)' } as Record<string, string>)[name]}><Input /></Form.Item>)}
           </div>
 
+          <AssignmentFields form={addForm}/>
           <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
             <Button onClick={() => setIsAddModalOpen(false)}>Hủy</Button>
             <Button type="primary" htmlType="submit" loading={submitting}>
@@ -379,14 +690,10 @@ export default function WorkersPage() {
       {/* Modal Cập Nhật Trạng Thái & Báo Nghỉ Việc */}
       <Modal title={`Cập Nhật Trạng Thái: ${selectedWorker?.fullName}`} open={isStatusModalOpen} onCancel={() => setIsStatusModalOpen(false)} footer={null}>
         <Form form={statusForm} layout="vertical" onFinish={handleUpdateStatus} className="mt-4">
+          <AssignmentFields form={statusForm} showWorkDays/>
           <div className="grid grid-cols-2 gap-3">{Object.entries({ fullName: 'Họ tên', phone: 'SĐT', dob: 'Ngày sinh', gender: 'Giới tính', code: 'Mã NV', idCardDate: 'Ngày cấp', idCardPlace: 'Nơi cấp', address: 'Địa chỉ', province: 'Tỉnh/Thành', team: 'Đội nhóm', recruiter: 'Tuyển dụng', source: 'Nguồn', interviewFactory: 'Nhà máy PV', workingFactory: 'Nhà máy làm việc', contractType: 'Loại hợp đồng', shuttleBusKtx: 'Đón xe / KTX', interviewDate: 'Ngày PV', expectedTrainingDate: 'Ngày đào tạo dự kiến', expectedTrainingStatus: 'Tình trạng đào tạo dự kiến', standardTrainingDate: 'Ngày đào tạo chuẩn', onboardingMonth: 'Tháng nhận việc' }).map(([name, label]) => <Form.Item key={name} name={name} label={label}><Input /></Form.Item>)}</div>
           <Form.Item name="status" label="Tình Trạng Làm Việc">
-            <Select options={[
-            { label: 'Đang làm việc (Còn LV)', value: 'Đang làm việc' },
-            { label: 'Đã nghỉ việc', value: 'Đã nghỉ việc' },
-            { label: 'Đạt phỏng vấn', value: 'Đạt phỏng vấn' },
-            { label: 'Đang chờ phỏng vấn', value: 'Đang chờ phỏng vấn' },
-        ]}/>
+            <Select options={STATUSES.map(value=>({value,label:value}))}/>
           </Form.Item>
 
           <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}>

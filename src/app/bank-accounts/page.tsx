@@ -22,6 +22,8 @@ export default function BankAccountsPage() {
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState('ALL');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     // Modal thêm tài khoản
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [workersList, setWorkersList] = useState<any[]>([]);
@@ -239,7 +241,25 @@ export default function BankAccountsPage() {
 
       {/* Table */}
       <Card className="shadow-sm border-slate-200 overflow-hidden">
-        <Table columns={columns} dataSource={accounts} rowKey="id" loading={loading} pagination={{ pageSize: 10, showSizeChanger: true }} bordered size="middle"/>
+        <Table
+          columns={columns}
+          dataSource={accounts}
+          rowKey="id"
+          loading={loading}
+          pagination={{
+            current: currentPage,
+            pageSize: pageSize,
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100', '200'],
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size);
+            },
+            showTotal: (total, range) => `${range[0]} - ${range[1]} / ${total} tài khoản`,
+          }}
+          bordered
+          size="middle"
+        />
       </Card>
 
       {/* Modal Thêm STK */}

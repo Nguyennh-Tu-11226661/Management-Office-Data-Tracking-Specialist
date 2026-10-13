@@ -47,7 +47,7 @@ const server = {'@/lib/auth': {guard:async()=>null,identity:async()=>({username:
   assert.equal(validation.dateKey('29/02/2024'),'2024-02-29');
   assert.equal(validation.phoneKey('+84 900 000 001'),'0900000001');
   assert.throws(()=>validation.validateWorker({fullName:'Test',idCard:'000000000001'},{interviewFactory:'Test',status:'Đã nghỉ việc',interviewDate:'10/10/2026',leaveDate:'09/10/2026',leaveReason:'Test'}));
-  const parser=load('src/lib/worker-import.ts',{'xlsx':require('xlsx'),'@/lib/worker-validation':validation});
+  const parser=load('src/lib/worker-import.ts',{'xlsx':require('xlsx'),'@/lib/worker-validation':validation,'@/lib/source-format':load('src/lib/source-format.ts',{'@/lib/worker-validation':validation})});
   assert.throws(()=>parser.parseImportRow({'Họ và tên':'Test','số CCCD':123456789,'Nhà máy PV':'Test'}));
   const imported=parser.parseImportRow({'Họ và tên ':'Test','số CCCD':'000000000001','SĐT':'0900000001','Nhà máy PV':'Test','Ngày PV':46307});
   assert.equal(imported.worker.idCard,'000000000001');assert.ok(validation.dateKey(imported.assignment.interviewDate));

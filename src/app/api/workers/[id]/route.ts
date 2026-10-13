@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { assignmentRelations, resultError, today, day, DomainError } from '@/lib/domain';
 import { prisma } from '@/lib/prisma';
 import { guard, identity } from '@/lib/auth';
-import { WORKER_FIELDS, ASSIGNMENT_FIELDS, cleanFields, validateWorker, phoneKey } from '@/lib/worker-validation';
+import { WORKER_FIELDS, ASSIGNMENT_FIELDS, cleanFields, validateWorker, phoneKey, ended, validateInterview } from '@/lib/worker-validation';
 export async function PUT(request: NextRequest, { params }: {
     params: {
         id: string;
@@ -14,6 +15,7 @@ export async function PUT(request: NextRequest, { params }: {
     try {
         body = await request.json();
         worker = cleanFields(body, WORKER_FIELDS);
+        if(body.idCard!==undefined){worker.idCard=String(body.idCard).trim();if(!/^(\d{9}|\d{12})$/.test(worker.idCard))throw new Error('CCCD không hợp lệ');}
         assignment = cleanFields(body, ASSIGNMENT_FIELDS);
     }
     catch (error: any) {
@@ -25,15 +27,15 @@ export async function PUT(request: NextRequest, { params }: {
             const current = await tx.worker.findUnique({ where: { id: params.id }, include: { assignments: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] } } });
             if (!current)
                 return { status: 404, body: { success: false, message: 'Không tìm thấy hồ sơ' } };
-            const latest = current.assignments[0];
+            const latest = current.assignments.find(a=>a.id===body.assignmentId);
             if (!latest)
                 return { status: 409, body: { success: false, message: 'Hồ sơ chưa có đợt tuyển dụng' } };
-            if (body.assignmentId !== latest.id || body.updatedAt !== current.updatedAt.toISOString() || body.assignmentUpdatedAt !== latest.updatedAt.toISOString())
+            if (!body.assignmentId || body.updatedAt !== current.updatedAt.toISOString() || body.assignmentUpdatedAt !== latest.updatedAt.toISOString())
                 return { status: 409, body: { success: false, message: 'Hồ sơ hoặc đợt tuyển đã thay đổi, vui lòng tải lại' } };
             const merged = { ...latest, ...assignment };
-            if (latest.status === 'Đã nghỉ việc' && merged.status !== 'Đã nghỉ việc')
+            if (ended(latest.status) && !ended(merged.status))
                 return { status: 409, body: { success: false, message: 'Dùng tái tuyển dụng để giữ lịch sử đợt đã nghỉ' } };
-            if (merged.status !== 'Đã nghỉ việc') {
+            if (!['Đã nghỉ việc','Nghỉ hẳn','Hết hợp đồng','Bỏ xưởng','Bỏ vì sức khỏe','Hết phí'].includes(merged.status)) {
                 assignment.leaveDate = '';
                 assignment.leaveReason = '';
                 merged.leaveDate = '';
@@ -41,29 +43,37 @@ export async function PUT(request: NextRequest, { params }: {
             }
             try {
                 validateWorker({ ...current, ...worker }, merged);
+                validateInterview(merged);
+                await assignmentRelations(tx,merged,latest);
+                if(body.recruiterId!==undefined||body.teamId!==undefined)Object.assign(assignment,{recruiter:merged.recruiter,team:merged.team,teamId:merged.teamId});
             }
             catch (error: any) {
                 return { status: 400, body: { success: false, message: error.message } };
             }
             if (worker.phone) {
-                const others = await tx.worker.findMany({ where: { id: { not: current.id }, phone: { not: null } }, select: { phone: true } });
+                const names=await tx.laborStatus.findMany({where:{warnsDuplicate:true,isActive:true}});
+                const others = await tx.worker.findMany({ where: { id: { not: current.id }, phone: { not: null },archivedAt:null,assignments:{some:{status:{in:names.map(s=>s.name)}}} }, select: { phone: true } });
                 if (others.some(w => phoneKey(w.phone!) === worker.phone) && body.confirmPhoneDuplicate !== true)
                     return { status: 409, body: { success: false, isDuplicate: true, duplicateType: 'PHONE', message: 'SĐT đã có trong hồ sơ khác; cần xác nhận dùng chung số' } };
             }
+            const enrolled=await tx.policyEnrollment.count({where:{assignmentId:latest.id}});
+            if(enrolled && ['interviewDate','passedDate','interviewResult','interviewFactory','orderId','batchId'].some(f=>assignment[f]!==undefined&&assignment[f]!==latest[f]))throw new DomainError('Đợt đã áp dụng chính sách: không thay ngày PV, ngày đỗ, kết quả hoặc đơn hàng',409);
+            if(body.confirmedWorkDays!==undefined){
+              const count=body.confirmedWorkDays;if(typeof count!=='number'||!Number.isFinite(count)||count<0||count>10000)throw new DomainError('Số công xác nhận không hợp lệ');
+              const asOf=day(body.workDaysAsOf,'ngày chốt công'),passed=merged.passedDate?day(merged.passedDate,'ngày đỗ'):null;
+              if(!passed||asOf<=passed||count>(Date.parse(asOf)-Date.parse(passed))/86400000)throw new DomainError('Chỉ chốt công sau ngày đỗ; số công không vượt số ngày trong khoảng');
+              Object.assign(assignment,{confirmedWorkDays:count,workDaysAsOf:asOf,workDaysConfirmedBy:actor.username});
+            }
             await tx.worker.update({ where: { id: params.id }, data: worker });
             await tx.workAssignment.update({ where: { id: latest.id }, data: assignment });
+            await tx.assignmentEvent.create({data:{assignmentId:latest.id,occurredOn:body.eventDate?day(body.eventDate,'ngày thay đổi'):today(),fromStatus:latest.status,toStatus:merged.status,interviewResult:merged.interviewResult,operator:actor.username,note:body.eventNote?String(body.eventNote).slice(0,1000):null}});
             await tx.auditLog.create({ data: { action: 'UPDATE', module: 'WORKER', operator: actor.username, details: `Cập nhật hồ sơ ${current.id}, đợt ${latest.id}: ${latest.status} → ${merged.status}` } });
             return { status: 200, body: { success: true, data: await tx.worker.findUnique({ where: { id: params.id }, include: { assignments: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] } } }) } };
         });
         return NextResponse.json(result.body, { status: result.status });
     }
-    catch {
-        return NextResponse.json({ success: false, message: 'Không thể cập nhật hồ sơ' }, { status: 500 });
-    }
+    catch(e) {return resultError(e);}
 }
-export async function DELETE(request: NextRequest) {
-    const denied = await guard(request, 'worker:write');
-    if (denied)
-        return denied;
-    return NextResponse.json({ success: false, message: 'Không xóa vĩnh viễn hồ sơ và lịch sử thưởng. Hãy ghi nhận nghỉ việc.' }, { status: 405 });
-}
+export async function DELETE(request:NextRequest,{params}:{params:{id:string}}){
+ const denied=await guard(request,'worker:write');if(denied)return denied;try{const actor=(await identity(request))!;const data=await prisma.$transaction(async tx=>{const current=await tx.worker.findUnique({where:{id:params.id},include:{assignments:true}});if(!current)throw new DomainError('Không có hồ sơ',404);const ended=await tx.laborStatus.findMany({where:{endsAssignment:true}});if(current.assignments.some(a=>!ended.some(s=>s.name===a.status)))throw new DomainError('Hồ sơ có đợt đang hoạt động. Chốt trạng thái trước khi lưu trữ.',409);const row=await tx.worker.update({where:{id:current.id},data:{archivedAt:new Date(),archivedBy:actor.username}});await tx.auditLog.create({data:{module:'WORKER',action:'ARCHIVE',operator:actor.username,details:`Lưu trữ hồ sơ ${current.id}; không xóa lịch sử`}});return row;});return NextResponse.json({success:true,data});}catch(e){return resultError(e);}}
+export async function PATCH(request:NextRequest,{params}:{params:{id:string}}){const denied=await guard(request,'worker:write');if(denied)return denied;try{const actor=(await identity(request))!;const data=await prisma.$transaction(async tx=>{const row=await tx.worker.update({where:{id:params.id},data:{archivedAt:null,archivedBy:null}});await tx.auditLog.create({data:{module:'WORKER',action:'RESTORE',operator:actor.username,details:`Khôi phục hồ sơ ${row.id}`}});return row;});return NextResponse.json({success:true,data});}catch(e){return resultError(e);}}

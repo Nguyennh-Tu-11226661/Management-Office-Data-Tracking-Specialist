@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output = "../.generated/client"
 }
 
 datasource db {
@@ -28,6 +29,8 @@ model Worker {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
+  archivedAt DateTime?
+  archivedBy String?
   assignments     WorkAssignment[]
   bonusRecords    BonusRecord[]
   bankAccounts    BankAccount[]
@@ -55,6 +58,24 @@ model WorkAssignment {
   updatedAt              DateTime  @updatedAt
 
   bonusRecords           BonusRecord[]
+  orderId                String?
+  order                  RecruitmentOrder? @relation(fields: [orderId], references: [id])
+  batchId                String?
+  batch                  RecruitmentBatch? @relation(fields: [batchId], references: [id])
+  team                   String?
+  recruiterId            String?
+  recruiterPerson        Recruiter? @relation(fields:[recruiterId],references:[id])
+  teamId                 String?
+  teamEntry              RecruitmentTeam? @relation(fields:[teamId],references:[id])
+  employeeCode           String?
+  interviewResult        String @default("UNKNOWN")
+  passedDate             String?
+  startDate              String?
+  confirmedWorkDays      Float?
+  workDaysAsOf           String?
+  workDaysConfirmedBy    String?
+  events                 AssignmentEvent[]
+  enrollments            PolicyEnrollment[]
 }
 
 model BonusRecord {
@@ -109,6 +130,11 @@ model BonusPolicy {
   name        String   // Tên chính sách (VD: Chính sách mùa vụ Luxshare 2026)
   factory     String   // Nhà máy áp dụng
   description String?
+  effectiveFrom String?
+  effectiveTo   String?
+  orderId       String?
+  order         RecruitmentOrder? @relation(fields: [orderId], references: [id])
+  enrollments   PolicyEnrollment[]
   rulesJson   String   // Chi tiết JSON: [{step: 1, milestone: "3 công", amount: 300000}, ...]
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -122,4 +148,142 @@ model AuditLog {
   details   String?
   operator  String?  @default("Hệ thống")
   createdAt DateTime @default(now())
+}
+
+model RecruitmentOrder {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  factory String
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  batches RecruitmentBatch[]
+  assignments WorkAssignment[]
+  policies BonusPolicy[]
+  factoryId String?
+  factoryEntry Factory? @relation(fields:[factoryId],references:[id])
+}
+model RecruitmentBatch {
+  id String @id @default(cuid())
+  orderId String
+  order RecruitmentOrder @relation(fields:[orderId],references:[id])
+  code String
+  name String
+  startDate String
+  endDate String
+  periodMonth String?
+  target Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  assignments WorkAssignment[]
+  @@unique([orderId,code])
+}
+model AssignmentEvent {
+  id String @id @default(cuid())
+  assignmentId String
+  assignment WorkAssignment @relation(fields:[assignmentId],references:[id])
+  occurredOn String
+  fromStatus String?
+  toStatus String
+  interviewResult String?
+  note String?
+  operator String
+  createdAt DateTime @default(now())
+}
+model PolicyEnrollment {
+  id String @id @default(cuid())
+  assignmentId String
+  assignment WorkAssignment @relation(fields:[assignmentId],references:[id])
+  policyId String
+  policy BonusPolicy @relation(fields:[policyId],references:[id])
+  policyName String
+  factory String
+  effectiveFrom String
+  effectiveTo String
+  rulesSnapshot String
+  createdBy String
+  createdAt DateTime @default(now())
+  stages RewardStage[]
+  @@unique([assignmentId,policyId])
+}
+model RewardStage {
+  id String @id @default(cuid())
+  enrollmentId String
+  enrollment PolicyEnrollment @relation(fields:[enrollmentId],references:[id])
+  step Int
+  label String
+  thresholdDays Float?
+  amount Int
+  eligible Boolean @default(false)
+  eligibleAsOf String?
+  achieved Boolean @default(false)
+  achievedOn String?
+  confirmedBy String?
+  confirmationNote String?
+  updatedAt DateTime @updatedAt
+  payments RewardPayment[]
+  @@unique([enrollmentId,step])
+}
+model RewardPayment {
+  id String @id @default(cuid())
+  stageId String
+  stage RewardStage @relation(fields:[stageId],references:[id])
+  amount Int
+  paidOn String
+  reference String @unique
+  note String?
+  confirmedBy String
+  createdAt DateTime @default(now())
+}
+
+model Factory {
+ id String @id @default(cuid())
+ code String @unique
+ name String @unique
+ isActive Boolean @default(true)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ orders RecruitmentOrder[]
+}
+model RecruitmentTeam {
+ id String @id @default(cuid())
+ code String @unique
+ name String
+ isActive Boolean @default(true)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ recruiters Recruiter[]
+ assignments WorkAssignment[]
+}
+model Recruiter {
+ id String @id @default(cuid())
+ code String @unique
+ name String
+ teamId String?
+ team RecruitmentTeam? @relation(fields:[teamId],references:[id])
+ isActive Boolean @default(true)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ assignments WorkAssignment[]
+}
+model LaborStatus {
+ id String @id @default(cuid())
+ name String @unique
+ category String
+ warnsDuplicate Boolean @default(false)
+ endsAssignment Boolean @default(false)
+ isActive Boolean @default(true)
+ updatedAt DateTime @updatedAt
+}
+model ImportProfile {
+ id String @id @default(cuid())
+ name String @unique
+ sheetName String @default("DS_TONG")
+ mappingJson String
+ sourceUrl String?
+ syncDirection String @default("IMPORT_ONLY")
+ isActive Boolean @default(true)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
 }
