@@ -1,5 +1,5 @@
 import {splitImportReview} from '@/lib/import-review';
-import {mkdir,writeFile,rename,readdir,readFile} from 'node:fs/promises';
+import {mkdir,writeFile,rename,readdir,readFile,unlink} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import path from 'node:path';
 const directory=path.resolve('.local/source-imports');
@@ -11,4 +11,12 @@ export async function saveImportSource(type:string,file:string,sheet:string,rows
 export async function readImportSources(){
  let files:string[];try{files=await readdir(directory);}catch(e:any){if(e.code==='ENOENT')return [];throw e;}
  return Promise.all(files.filter(f=>/^[a-f0-9-]+\.json$/.test(f)).map(async f=>JSON.parse(await readFile(path.join(directory,f),'utf8'))));
+}
+export async function deleteImportSource(id?:string){
+ let files:string[];try{files=await readdir(directory);}catch(e:any){if(e.code==='ENOENT')return;throw e;}
+ for(const f of files.filter(f=>/^[a-f0-9-]+\.json$/.test(f))){
+  if(!id||f===`${id}.json`){
+   await unlink(path.join(directory,f)).catch(()=>{});
+  }
+ }
 }

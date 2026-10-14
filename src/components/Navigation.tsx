@@ -17,6 +17,7 @@ import {
   Coins,
   CreditCard,
   Award,
+  TrendingUp,
   SlidersHorizontal,
   Layers,
   Search,
@@ -48,6 +49,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/workers', label: 'Hồ sơ lao động (DS_TONG)', icon: FileText },
       { href: '/', label: 'Tổng quan Dashboard', icon: LayoutDashboard },
+      { href: '/performance', label: 'Đánh giá & So sánh KPI', icon: TrendingUp },
       { href: '/orders', label: 'Đơn hàng & đợt tuyển', icon: Target },
       { href: '/duplicates', label: 'Cảnh báo trùng lặp', icon: ShieldAlert },
       { href: '/lookup', label: 'Tra cứu người LĐ', icon: Fingerprint },
@@ -76,6 +78,7 @@ const navGroups: NavGroup[] = [
 
 const TAB_TITLES: Record<string, { title: string; subtitle?: string }> = {
   '/': { title: 'Tổng quan Dashboard', subtitle: 'Báo cáo tiến độ và công suất phễu tuyển dụng toàn công ty' },
+  '/performance': { title: 'Đánh giá & So sánh KPI', subtitle: 'So sánh hiệu suất tuyển dụng theo Team & Chuyên viên và phân tích chân dung người lao động' },
   '/workers': { title: 'Hồ sơ lao động (DS_TONG)', subtitle: 'Kiểm tra hồ sơ và xuất dữ liệu đang lọc' },
   '/orders': { title: 'Đơn hàng & đợt tuyển', subtitle: 'Theo dõi tiến độ đơn hàng và chỉ tiêu theo từng nhà máy' },
   '/duplicates': { title: 'Cảnh báo trùng lặp', subtitle: 'Phát hiện ứng viên trùng CCCD, SĐT hoặc nghỉ việc quay lại' },

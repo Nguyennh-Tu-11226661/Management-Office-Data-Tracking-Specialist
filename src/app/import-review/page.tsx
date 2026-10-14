@@ -13,6 +13,7 @@ import {
   Tooltip,
   Badge,
   message,
+  Popconfirm,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -27,6 +28,7 @@ import {
   Info,
   Building2,
   Calendar,
+  Trash2,
 } from 'lucide-react';
 
 interface Issue {
@@ -512,15 +514,50 @@ export default function ImportReviewPage() {
             Minh bạch hóa các dòng dữ liệu bị lệch hồ sơ hoặc có nguy cơ trùng lặp tiền thưởng khi nạp Excel.
           </p>
         </div>
-        <Button
-          icon={<RefreshCw className={`w-3.5 h-3.5 ${busy ? 'animate-spin' : ''}`} />}
-          onClick={load}
-          loading={busy}
-          size="middle"
-          className="self-start sm:self-auto font-medium"
-        >
-          Làm mới
-        </Button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <Popconfirm
+            title="Xóa toàn bộ lịch sử kiểm tra"
+            description="Bạn có chắc muốn dọn sạch toàn bộ các lượt nạp và bản ghi kiểm tra nguồn không?"
+            onConfirm={async () => {
+              try {
+                setBusy(true);
+                const res = await fetch('/api/import-review', { method: 'DELETE' });
+                const json = await res.json();
+                if (json.success) {
+                  message.success(json.message);
+                  setData({ warnings: [], duplicates: [] });
+                } else {
+                  message.error(json.message);
+                }
+              } catch {
+                message.error('Không thể xóa lịch sử kiểm tra');
+              } finally {
+                setBusy(false);
+              }
+            }}
+            okText="Xóa sạch"
+            cancelText="Hủy"
+            okButtonProps={{ danger: true }}
+          >
+            <Button
+              danger
+              icon={<Trash2 className="w-3.5 h-3.5" />}
+              size="middle"
+              className="font-medium"
+            >
+              Xóa lịch sử kiểm tra
+            </Button>
+          </Popconfirm>
+          <Button
+            icon={<RefreshCw className={`w-3.5 h-3.5 ${busy ? 'animate-spin' : ''}`} />}
+            onClick={load}
+            loading={busy}
+            size="middle"
+            className="font-medium"
+          >
+            Làm mới
+          </Button>
+        </div>
       </div>
 
       {/* Thẻ thống kê nhanh (KPI Overview Cards) */}
