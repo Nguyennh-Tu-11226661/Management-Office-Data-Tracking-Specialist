@@ -32,4 +32,3 @@ Phạm vi: kiểm tra mã nguồn hiện tại theo đặc tả DS Tổng/DS Th�
 Ưu tiên sửa: phân quyền/import duyệt/khóa và STK → liên kết đợt và nguồn thưởng → xác nhận kết quả PV → validation/import preview → lọc/dashboard. Trước khi xử lý dữ liệu đã có cần sao lưu và đối chiếu file nguồn; không tự xóa hoặc sửa lịch sử.
 
 - Kiểm thử HTTP lần này chưa hoàn tất: lần chạy sandbox không truy cập được server QA, lần tiếp theo gặp cổng 3101 đang bị chiếm. Không dùng kết quả 91 kiểm tra từ bản trước để chứng nhận mã hiện tại. Hash database gốc, schema và .env giữ nguyên qua lần thử. Chưa xác minh đầy đủ giao diện hoặc dữ liệu đang lưu trong bản sao; chưa chạy build mới trong lượt rà soát.
-

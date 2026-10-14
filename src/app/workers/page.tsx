@@ -1,8 +1,8 @@
-'use client';
-import AssignmentFields from '@/components/AssignmentFields';
-import { STATUSES } from '@/lib/worker-validation';
-import { useIdentity } from '@/components/AuthGate';
-import React, { useEffect, useState } from 'react';
+"use client";
+import AssignmentFields from "@/components/AssignmentFields";
+import { STATUSES } from "@/lib/worker-validation";
+import { useIdentity } from "@/components/AuthGate";
+import React, { useEffect, useState } from "react";
 import {
   Table,
   Button,
@@ -18,7 +18,7 @@ import {
   Descriptions,
   Tooltip,
   Alert,
-} from 'antd';
+} from "antd";
 import {
   UserPlus,
   Search,
@@ -30,43 +30,49 @@ import {
   Eye,
   RotateCcw,
   ExternalLink,
-} from 'lucide-react';
+} from "lucide-react";
 
 const FACTORIES = [
-  'Luxshare QC',
-  'Canon',
-  'Goertek',
-  'Fushan',
-  'Amphenol',
-  'Foxconn',
-  'Luxshare VT',
-  'LG',
-  'Bảo vệ',
+  "Luxshare QC",
+  "Canon",
+  "Goertek",
+  "Fushan",
+  "Amphenol",
+  "Foxconn",
+  "Luxshare VT",
+  "LG",
+  "Bảo vệ",
 ];
 
 export default function WorkersPage() {
   const user = useIdentity();
-  const canWrite = user?.permissions.includes('worker:write');
+  const canWrite = user?.permissions.includes("worker:write");
   const [archived, setArchived] = useState(false);
-  const [month, setMonth] = useState('');
-  const [sourceMonth, setSourceMonth] = useState('');
+  const [month, setMonth] = useState("");
+  const [sourceMonth, setSourceMonth] = useState("");
   const [activeConfirm, setActiveConfirm] = useState(false);
   const [rehire, setRehire] = useState(false);
   const [historyWorker, setHistoryWorker] = useState<any>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [workers, setWorkers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
-  const [factoryFilter, setFactoryFilter] = useState('');
+  const [search, setSearch] = useState("");
+  const [factoryFilter, setFactoryFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [sourceOptions, setSourceOptions] = useState<Record<string, string[]>>({});
-  const [recruiterFilter, setRecruiterFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState("");
+  const [sourceOptions, setSourceOptions] = useState<Record<string, string[]>>(
+    {},
+  );
+  const [recruiterFilter, setRecruiterFilter] = useState("");
   const [warningsOnly, setWarningsOnly] = useState(false);
   const [pendingDuplicateCount, setPendingDuplicateCount] = useState(0);
   const [systemWarningCount, setSystemWarningCount] = useState(0);
-  const [sourceTotals, setSourceTotals] = useState({ totalRows: 0, sourceRows: 0, warningRows: 0 });
+  const [sourceTotals, setSourceTotals] = useState({
+    totalRows: 0,
+    sourceRows: 0,
+    warningRows: 0,
+  });
 
   // Modal thêm mới
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -89,11 +95,11 @@ export default function WorkersPage() {
         month,
         sourceMonth,
         recruiter: recruiterFilter,
-        ...(warningsOnly ? { warningsOnly: 'true' } : {}),
+        ...(warningsOnly ? { warningsOnly: "true" } : {}),
       });
-      if (search) params.append('search', search);
-      if (factoryFilter) params.append('factory', factoryFilter);
-      if (statusFilter) params.append('status', statusFilter);
+      if (search) params.append("search", search);
+      if (factoryFilter) params.append("factory", factoryFilter);
+      if (statusFilter) params.append("status", statusFilter);
 
       const res = await fetch(`/api/worker-source-rows?${params.toString()}`);
       const json = await res.json();
@@ -109,7 +115,7 @@ export default function WorkersPage() {
         });
       }
     } catch {
-      message.error('Lỗi tải danh sách hồ sơ');
+      message.error("Lỗi tải danh sách hồ sơ");
     } finally {
       setLoading(false);
     }
@@ -118,7 +124,15 @@ export default function WorkersPage() {
   useEffect(() => {
     setCurrentPage(1);
     fetchWorkers();
-  }, [factoryFilter, statusFilter, archived, month, sourceMonth, recruiterFilter, warningsOnly]);
+  }, [
+    factoryFilter,
+    statusFilter,
+    archived,
+    month,
+    sourceMonth,
+    recruiterFilter,
+    warningsOnly,
+  ]);
 
   const handleSearch = () => {
     setCurrentPage(1);
@@ -126,12 +140,12 @@ export default function WorkersPage() {
   };
 
   const handleResetFilters = () => {
-    setSearch('');
-    setFactoryFilter('');
-    setStatusFilter('');
-    setSourceMonth('');
-    setMonth('');
-    setRecruiterFilter('');
+    setSearch("");
+    setFactoryFilter("");
+    setStatusFilter("");
+    setSourceMonth("");
+    setMonth("");
+    setRecruiterFilter("");
     setWarningsOnly(false);
     setCurrentPage(1);
   };
@@ -140,27 +154,35 @@ export default function WorkersPage() {
   const handleAddWorker = async (values: any) => {
     try {
       setSubmitting(true);
-      const res = await fetch('/api/workers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...values, rehire, confirmActiveDuplicate: activeConfirm }),
+      const res = await fetch("/api/workers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...values,
+          rehire,
+          confirmActiveDuplicate: activeConfirm,
+        }),
       });
       const json = await res.json();
       if (json.success) {
-        message.success('Đã thêm hồ sơ người lao động thành công!');
+        message.success("Đã thêm hồ sơ người lao động thành công!");
         setIsAddModalOpen(false);
         addForm.resetFields();
         fetchWorkers();
       } else {
-        if (json.duplicateType === 'ACTIVE_LABOR') {
+        if (json.duplicateType === "ACTIVE_LABOR") {
           Modal.confirm({
-            title: 'CCCD đang làm/chưa đào tạo',
+            title: "CCCD đang làm/chưa đào tạo",
             content: json.message,
             onOk: async () => {
-              const response = await fetch('/api/workers', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...values, rehire: true, confirmActiveDuplicate: true }),
+              const response = await fetch("/api/workers", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ...values,
+                  rehire: true,
+                  confirmActiveDuplicate: true,
+                }),
               });
               const result = await response.json();
               if (!result.success) {
@@ -171,15 +193,19 @@ export default function WorkersPage() {
               fetchWorkers();
             },
           });
-        } else if (json.duplicateType === 'PHONE') {
+        } else if (json.duplicateType === "PHONE") {
           Modal.confirm({
-            title: 'Xác nhận dùng chung SĐT sau khi xác minh',
+            title: "Xác nhận dùng chung SĐT sau khi xác minh",
             content: json.message,
             onOk: async () => {
-              const response = await fetch('/api/workers', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...values, rehire, confirmPhoneDuplicate: true }),
+              const response = await fetch("/api/workers", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ...values,
+                  rehire,
+                  confirmPhoneDuplicate: true,
+                }),
               });
               const result = await response.json();
               if (!result.success) {
@@ -193,16 +219,16 @@ export default function WorkersPage() {
           });
         } else if (json.isDuplicate) {
           Modal.error({
-            title: 'CẢNH BÁO TRÙNG LẶP DỮ LIỆU',
+            title: "CẢNH BÁO TRÙNG LẶP DỮ LIỆU",
             content: json.message,
-            okText: 'Đã hiểu',
+            okText: "Đã hiểu",
           });
         } else {
-          message.error(json.message || 'Lỗi thêm hồ sơ');
+          message.error(json.message || "Lỗi thêm hồ sơ");
         }
       }
     } catch {
-      message.error('Lỗi gửi dữ liệu lên máy chủ');
+      message.error("Lỗi gửi dữ liệu lên máy chủ");
     } finally {
       setSubmitting(false);
     }
@@ -214,16 +240,21 @@ export default function WorkersPage() {
     const assignment = worker.assignments?.[0];
     statusForm.resetFields();
     statusForm.setFieldsValue({
-      fullName: worker.sourceValues?.['Họ và tên'] || worker.fullName,
-      idCard: worker.sourceValues?.['Số CCCD'] || worker.idCard,
-      phone: worker.sourceValues?.['SĐT'] || worker.phone,
+      fullName: worker.sourceValues?.["Họ và tên"] || worker.fullName,
+      idCard: worker.sourceValues?.["Số CCCD"] || worker.idCard,
+      phone: worker.sourceValues?.["SĐT"] || worker.phone,
       ...worker,
       ...assignment,
-      status: worker.sourceValues?.['Tình trạng'] || assignment?.status || 'Đang làm việc',
-      leaveDate: worker.sourceValues?.['Ngày NH'] || assignment?.leaveDate || '',
-      leaveReason: worker.sourceValues?.['Lý do'] || assignment?.leaveReason || '',
+      status:
+        worker.sourceValues?.["Tình trạng"] ||
+        assignment?.status ||
+        "Đang làm việc",
+      leaveDate:
+        worker.sourceValues?.["Ngày NH"] || assignment?.leaveDate || "",
+      leaveReason:
+        worker.sourceValues?.["Lý do"] || assignment?.leaveReason || "",
       workingFactory:
-        worker.sourceValues?.['Nhà máy làm việc'] ||
+        worker.sourceValues?.["Nhà máy làm việc"] ||
         assignment?.workingFactory ||
         assignment?.interviewFactory,
     });
@@ -236,8 +267,8 @@ export default function WorkersPage() {
     try {
       const targetId = selectedWorker.workerId || selectedWorker.id;
       const res = await fetch(`/api/workers/${targetId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...values,
           assignmentId: selectedWorker.assignments?.[0]?.id,
@@ -247,14 +278,14 @@ export default function WorkersPage() {
       });
       const json = await res.json();
       if (json.success) {
-        message.success('Đã cập nhật trạng thái hồ sơ');
+        message.success("Đã cập nhật trạng thái hồ sơ");
         setIsStatusModalOpen(false);
         fetchWorkers();
       } else {
         message.error(json.message);
       }
     } catch {
-      message.error('Lỗi cập nhật');
+      message.error("Lỗi cập nhật");
     }
   };
 
@@ -277,21 +308,39 @@ export default function WorkersPage() {
   };
 
   const getStatusTag = (status: string) => {
-    const s = String(status || '').trim();
+    const s = String(status || "").trim();
     if (!s) return <Tag>Chưa có TT</Tag>;
-    if (['Đang làm việc', 'LV', 'Chuyển chính thức'].includes(s)) {
+    if (["Đang làm việc", "LV", "Chuyển chính thức"].includes(s)) {
       return <Tag color="success">{s}</Tag>;
     }
-    if (['Đã nghỉ việc', 'NH', 'Nghỉ hẳn', 'HHĐ', 'Hết hợp đồng', 'Tự ý nghỉ việc'].includes(s)) {
+    if (
+      [
+        "Đã nghỉ việc",
+        "NH",
+        "Nghỉ hẳn",
+        "HHĐ",
+        "Hết hợp đồng",
+        "Tự ý nghỉ việc",
+      ].includes(s)
+    ) {
       return <Tag color="error">{s}</Tag>;
     }
-    if (['Bỏ xưởng', 'Bỏ XX', 'Bỏ ĐT', 'Bỏ phỏng vấn', 'Bỏ đào tạo', 'Bỏ khác'].includes(s)) {
+    if (
+      [
+        "Bỏ xưởng",
+        "Bỏ XX",
+        "Bỏ ĐT",
+        "Bỏ phỏng vấn",
+        "Bỏ đào tạo",
+        "Bỏ khác",
+      ].includes(s)
+    ) {
       return <Tag color="warning">{s}</Tag>;
     }
-    if (['Trượt phỏng vấn', 'Trượt KSK'].includes(s)) {
+    if (["Trượt phỏng vấn", "Trượt KSK"].includes(s)) {
       return <Tag color="magenta">{s}</Tag>;
     }
-    if (['Đang đào tạo', 'Chưa đào tạo', 'Đang chờ phỏng vấn'].includes(s)) {
+    if (["Đang đào tạo", "Chưa đào tạo", "Đang chờ phỏng vấn"].includes(s)) {
       return <Tag color="processing">{s}</Tag>;
     }
     return <Tag color="default">{s}</Tag>;
@@ -300,21 +349,22 @@ export default function WorkersPage() {
   // 22 CỘT CHUẨN TỪ FILE QUẢN LÝ
   const columns = [
     {
-      title: 'STT',
-      key: 'STT',
+      title: "STT",
+      key: "STT",
       width: 60,
-      fixed: 'left' as const,
-      align: 'center' as const,
+      fixed: "left" as const,
+      align: "center" as const,
       render: (_: any, __: any, index: number) =>
         (currentPage - 1) * pageSize + index + 1,
     },
     {
-      title: 'Họ và tên',
-      key: 'Họ và tên',
+      title: "Họ và tên",
+      key: "Họ và tên",
       width: 175,
-      fixed: 'left' as const,
+      fixed: "left" as const,
       render: (_: any, record: any) => {
-        const name = record.sourceValues?.['Họ và tên'] || record.fullName || '—';
+        const name =
+          record.sourceValues?.["Họ và tên"] || record.fullName || "—";
         const hasWarning = (record.sourceWarnings || []).length > 0;
         return (
           <div className="flex items-center justify-between gap-1">
@@ -327,7 +377,9 @@ export default function WorkersPage() {
               {name}
             </button>
             {hasWarning && (
-              <Tooltip title={`${record.sourceWarnings.length} cảnh báo cần kiểm tra`}>
+              <Tooltip
+                title={`${record.sourceWarnings.length} cảnh báo cần kiểm tra`}
+              >
                 <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 inline-block" />
               </Tooltip>
             )}
@@ -336,36 +388,38 @@ export default function WorkersPage() {
       },
     },
     {
-      title: 'Số CCCD',
-      key: 'Số CCCD',
+      title: "Số CCCD",
+      key: "Số CCCD",
       width: 135,
-      fixed: 'left' as const,
+      fixed: "left" as const,
       render: (_: any, record: any) => (
         <span className="font-mono text-xs text-slate-800">
-          {record.sourceValues?.['Số CCCD'] || record.idCard || '—'}
+          {record.sourceValues?.["Số CCCD"] || record.idCard || "—"}
         </span>
       ),
     },
     {
-      title: 'Nhà máy PV',
-      key: 'Nhà máy PV',
+      title: "Nhà máy PV",
+      key: "Nhà máy PV",
       width: 120,
-      render: (_: any, record: any) => record.sourceValues?.['Nhà máy PV'] || '—',
+      render: (_: any, record: any) =>
+        record.sourceValues?.["Nhà máy PV"] || "—",
     },
     {
-      title: 'Nhà máy làm việc',
-      key: 'Nhà máy làm việc',
+      title: "Nhà máy làm việc",
+      key: "Nhà máy làm việc",
       width: 130,
-      render: (_: any, record: any) => record.sourceValues?.['Nhà máy làm việc'] || '—',
+      render: (_: any, record: any) =>
+        record.sourceValues?.["Nhà máy làm việc"] || "—",
     },
     {
-      title: 'Loại HĐ',
-      key: 'Loại HĐ',
+      title: "Loại HĐ",
+      key: "Loại HĐ",
       width: 155,
       render: (_: any, record: any) => {
         const val =
-          record.sourceValues?.['Loại HĐ'] ||
-          record.sourceValues?.['Loại HD'] ||
+          record.sourceValues?.["Loại HĐ"] ||
+          record.sourceValues?.["Loại HD"] ||
           record.assignments?.[0]?.contractType;
         return val ? (
           <span className="font-medium text-xs text-slate-800">{val}</span>
@@ -375,122 +429,146 @@ export default function WorkersPage() {
       },
     },
     {
-      title: 'Tình trạng',
-      key: 'Tình trạng',
+      title: "Tình trạng",
+      key: "Tình trạng",
       width: 125,
-      render: (_: any, record: any) => getStatusTag(record.sourceValues?.['Tình trạng']),
+      render: (_: any, record: any) =>
+        getStatusTag(record.sourceValues?.["Tình trạng"]),
     },
     {
-      title: 'Ngày NH',
-      key: 'Ngày NH',
+      title: "Ngày NH",
+      key: "Ngày NH",
       width: 100,
       render: (_: any, record: any) => {
-        const val = record.sourceValues?.['Ngày NH'];
-        return val ? <span className="text-rose-600 font-medium text-xs">{val}</span> : <span className="text-slate-400">—</span>;
+        const val = record.sourceValues?.["Ngày NH"];
+        return val ? (
+          <span className="text-rose-600 font-medium text-xs">{val}</span>
+        ) : (
+          <span className="text-slate-400">—</span>
+        );
       },
     },
     {
-      title: 'Lý do',
-      key: 'Lý do',
+      title: "Lý do",
+      key: "Lý do",
       width: 150,
       ellipsis: true,
-      render: (_: any, record: any) => record.sourceValues?.['Lý do'] || '—',
+      render: (_: any, record: any) => record.sourceValues?.["Lý do"] || "—",
     },
     {
-      title: 'Mã NV',
-      key: 'Mã NV',
+      title: "Mã NV",
+      key: "Mã NV",
       width: 95,
       render: (_: any, record: any) => {
-        const val = record.sourceValues?.['Mã NV'];
-        return val ? <span className="font-mono text-xs">{val}</span> : <span className="text-slate-400">—</span>;
+        const val = record.sourceValues?.["Mã NV"];
+        return val ? (
+          <span className="font-mono text-xs">{val}</span>
+        ) : (
+          <span className="text-slate-400">—</span>
+        );
       },
     },
     {
-      title: 'Ngày sinh',
-      key: 'Ngày sinh',
+      title: "Ngày sinh",
+      key: "Ngày sinh",
       width: 100,
-      render: (_: any, record: any) => record.sourceValues?.['Ngày sinh'] || '—',
+      render: (_: any, record: any) =>
+        record.sourceValues?.["Ngày sinh"] || "—",
     },
     {
-      title: 'Giới tính',
-      key: 'Giới tính',
+      title: "Giới tính",
+      key: "Giới tính",
       width: 75,
-      align: 'center' as const,
-      render: (_: any, record: any) => record.sourceValues?.['Giới tính'] || '—',
+      align: "center" as const,
+      render: (_: any, record: any) =>
+        record.sourceValues?.["Giới tính"] || "—",
     },
     {
-      title: 'Ngày cấp',
-      key: 'Ngày cấp',
+      title: "Ngày cấp",
+      key: "Ngày cấp",
       width: 100,
-      render: (_: any, record: any) => record.sourceValues?.['Ngày cấp'] || '—',
+      render: (_: any, record: any) => record.sourceValues?.["Ngày cấp"] || "—",
     },
     {
-      title: 'Địa chỉ',
-      key: 'Địa chỉ',
+      title: "Địa chỉ",
+      key: "Địa chỉ",
       width: 180,
       ellipsis: true,
-      render: (_: any, record: any) => record.sourceValues?.['Địa chỉ'] || '—',
+      render: (_: any, record: any) => record.sourceValues?.["Địa chỉ"] || "—",
     },
     {
-      title: 'SĐT',
-      key: 'SĐT',
+      title: "SĐT",
+      key: "SĐT",
       width: 110,
       render: (_: any, record: any) => {
-        const val = record.sourceValues?.['SĐT'];
-        return val ? <span className="font-mono text-xs">{val}</span> : <span className="text-slate-400">—</span>;
+        const val = record.sourceValues?.["SĐT"];
+        return val ? (
+          <span className="font-mono text-xs">{val}</span>
+        ) : (
+          <span className="text-slate-400">—</span>
+        );
       },
     },
     {
-      title: 'Tuyển dụng',
-      key: 'Tuyển dụng',
+      title: "Tuyển dụng",
+      key: "Tuyển dụng",
       width: 125,
-      render: (_: any, record: any) => record.sourceValues?.['Tuyển dụng'] || '—',
+      render: (_: any, record: any) =>
+        record.sourceValues?.["Tuyển dụng"] || "—",
     },
     {
-      title: 'Đón xe + KTX',
-      key: 'Đón xe + KTX',
+      title: "Đón xe + KTX",
+      key: "Đón xe + KTX",
       width: 120,
-      render: (_: any, record: any) => record.sourceValues?.['Đón xe + KTX'] || '—',
+      render: (_: any, record: any) =>
+        record.sourceValues?.["Đón xe + KTX"] || "—",
     },
     {
-      title: 'Ngày PV',
-      key: 'Ngày PV',
+      title: "Ngày PV",
+      key: "Ngày PV",
       width: 100,
-      render: (_: any, record: any) => record.sourceValues?.['Ngày PV'] || '—',
+      render: (_: any, record: any) => record.sourceValues?.["Ngày PV"] || "—",
     },
     {
-      title: 'Ngày Đào tạo dự kiến',
-      key: 'Ngày Đào tạo dự kiến',
+      title: "Ngày Đào tạo dự kiến",
+      key: "Ngày Đào tạo dự kiến",
       width: 120,
-      render: (_: any, record: any) => record.sourceValues?.['Ngày Đào tạo dự kiến'] || '—',
+      render: (_: any, record: any) =>
+        record.sourceValues?.["Ngày Đào tạo dự kiến"] || "—",
     },
     {
-      title: 'Tình trạng đào tạo',
-      key: 'Tình trạng đào tạo',
+      title: "Tình trạng đào tạo",
+      key: "Tình trạng đào tạo",
       width: 130,
-      render: (_: any, record: any) => record.sourceValues?.['Tình trạng đào tạo'] || '—',
+      render: (_: any, record: any) =>
+        record.sourceValues?.["Tình trạng đào tạo"] || "—",
     },
     {
-      title: 'Ngày đào tạo chuẩn',
-      key: 'Ngày đào tạo chuẩn',
+      title: "Ngày đào tạo chuẩn",
+      key: "Ngày đào tạo chuẩn",
       width: 120,
-      render: (_: any, record: any) => record.sourceValues?.['Ngày đào tạo chuẩn'] || '—',
+      render: (_: any, record: any) =>
+        record.sourceValues?.["Ngày đào tạo chuẩn"] || "—",
     },
     {
-      title: 'Tháng nhận việc',
-      key: 'Tháng nhận việc',
+      title: "Tháng nhận việc",
+      key: "Tháng nhận việc",
       width: 110,
       render: (_: any, record: any) => {
-        const val = record.sourceValues?.['Tháng nhận việc'];
-        return val ? <span className="font-semibold text-xs text-slate-800">{val}</span> : <span className="text-slate-400">—</span>;
+        const val = record.sourceValues?.["Tháng nhận việc"];
+        return val ? (
+          <span className="font-semibold text-xs text-slate-800">{val}</span>
+        ) : (
+          <span className="text-slate-400">—</span>
+        );
       },
     },
     {
-      title: 'Thao tác',
-      key: 'actions',
+      title: "Thao tác",
+      key: "actions",
       width: 110,
-      fixed: 'right' as const,
-      align: 'center' as const,
+      fixed: "right" as const,
+      align: "center" as const,
       render: (_: any, record: any) => (
         <Space size={2}>
           <Button
@@ -523,14 +601,19 @@ export default function WorkersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Danh sách người lao động</h1>
+          <h1 className="text-2xl font-bold text-slate-900">
+            Danh sách người lao động
+          </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Hiển thị đầy đủ 22 cột quản lý nguồn Excel. Khóa cố định cột Họ tên &amp; CCCD khi cuộn ngang.
+            Hiển thị đầy đủ 22 cột quản lý nguồn Excel. Khóa cố định cột Họ tên
+            &amp; CCCD khi cuộn ngang.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <a href="/api/excel-engine/export?type=WORKERS">
-            <Button icon={<Download className="w-4 h-4" />}>Xuất Excel DS_TONG</Button>
+            <Button icon={<Download className="w-4 h-4" />}>
+              Xuất Excel DS_TONG
+            </Button>
           </a>
           <Button
             type="primary"
@@ -552,7 +635,9 @@ export default function WorkersPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Tìm kiếm</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Tìm kiếm
+              </label>
               <Input
                 placeholder="Tên, CCCD, SĐT, Mã NV..."
                 value={search}
@@ -563,75 +648,114 @@ export default function WorkersPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Nhà máy phỏng vấn</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Nhà máy phỏng vấn
+              </label>
               <Select
                 className="w-full"
                 allowClear
                 placeholder="Tất cả nhà máy"
                 value={factoryFilter || undefined}
-                onChange={(v) => setFactoryFilter(v || '')}
-                options={(sourceOptions['Nhà máy PV'] || []).map((value) => ({ value, label: value }))}
+                onChange={(v) => setFactoryFilter(v || "")}
+                options={(sourceOptions["Nhà máy PV"] || []).map((value) => ({
+                  value,
+                  label: value,
+                }))}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Tình trạng</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Tình trạng
+              </label>
               <Select
                 className="w-full"
                 allowClear
                 placeholder="Tất cả tình trạng"
                 value={statusFilter || undefined}
-                onChange={(v) => setStatusFilter(v || '')}
-                options={(sourceOptions['Tình trạng'] || []).map((value) => ({ value, label: value }))}
+                onChange={(v) => setStatusFilter(v || "")}
+                options={(sourceOptions["Tình trạng"] || []).map((value) => ({
+                  value,
+                  label: value,
+                }))}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Tháng nhận việc</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Tháng nhận việc
+              </label>
               <Select
                 className="w-full"
                 allowClear
                 placeholder="Tất cả tháng nhận việc"
                 value={sourceMonth || undefined}
-                onChange={(v) => setSourceMonth(v || '')}
-                options={(sourceOptions['Tháng nhận việc'] || []).map((value) => ({ value, label: value }))}
+                onChange={(v) => setSourceMonth(v || "")}
+                options={(sourceOptions["Tháng nhận việc"] || []).map(
+                  (value) => ({ value, label: value }),
+                )}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Người tuyển dụng</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Người tuyển dụng
+              </label>
               <Select
                 className="w-full"
                 allowClear
                 placeholder="Tất cả tuyển dụng"
                 value={recruiterFilter || undefined}
-                onChange={(v) => setRecruiterFilter(v || '')}
-                options={(sourceOptions['Tuyển dụng'] || []).map((value) => ({ value, label: value }))}
+                onChange={(v) => setRecruiterFilter(v || "")}
+                options={(sourceOptions["Tuyển dụng"] || []).map((value) => ({
+                  value,
+                  label: value,
+                }))}
               />
             </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="primary" onClick={handleSearch} icon={<Filter className="w-4 h-4" />}>
+              <Button
+                type="primary"
+                onClick={handleSearch}
+                icon={<Filter className="w-4 h-4" />}
+              >
                 Áp dụng lọc
               </Button>
-              <Button onClick={handleResetFilters} icon={<RotateCcw className="w-4 h-4" />}>
+              <Button
+                onClick={handleResetFilters}
+                icon={<RotateCcw className="w-4 h-4" />}
+              >
                 Đặt lại
               </Button>
               <Button
-                type={warningsOnly ? 'primary' : 'default'}
+                type={warningsOnly ? "primary" : "default"}
                 danger={warningsOnly}
                 onClick={() => setWarningsOnly(!warningsOnly)}
               >
-                {warningsOnly ? 'Đang lọc: Chỉ dòng cảnh báo' : 'Chỉ dòng cảnh báo'}
+                {warningsOnly
+                  ? "Đang lọc: Chỉ dòng cảnh báo"
+                  : "Chỉ dòng cảnh báo"}
               </Button>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 text-xs">
-              <a className="text-amber-700 font-semibold hover:underline" href="/import-review?type=warnings">
-                Xem luồng cảnh báo ({(systemWarningCount || sourceTotals.warningRows).toLocaleString('vi-VN')})
+              <a
+                className="text-amber-700 font-semibold hover:underline"
+                href="/import-review?type=warnings"
+              >
+                Xem luồng cảnh báo (
+                {(
+                  systemWarningCount || sourceTotals.warningRows
+                ).toLocaleString("vi-VN")}
+                )
               </a>
               <span className="text-slate-300">|</span>
-              <a className="text-rose-600 font-semibold hover:underline" href="/import-review?type=duplicates">
-                Trùng lặp chờ duyệt ({pendingDuplicateCount.toLocaleString('vi-VN')})
+              <a
+                className="text-rose-600 font-semibold hover:underline"
+                href="/import-review?type=duplicates"
+              >
+                Trùng lặp chờ duyệt (
+                {pendingDuplicateCount.toLocaleString("vi-VN")})
               </a>
             </div>
           </div>
@@ -643,7 +767,7 @@ export default function WorkersPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-2">
             <Button
-              type={!archived ? 'primary' : 'default'}
+              type={!archived ? "primary" : "default"}
               size="small"
               onClick={() => {
                 setArchived(false);
@@ -654,7 +778,7 @@ export default function WorkersPage() {
               Hồ sơ hiện hành
             </Button>
             <Button
-              type={archived ? 'primary' : 'default'}
+              type={archived ? "primary" : "default"}
               size="small"
               onClick={() => {
                 setArchived(true);
@@ -667,8 +791,9 @@ export default function WorkersPage() {
           </div>
 
           <div className="text-xs text-slate-500 font-medium">
-            Hiển thị <strong>{workers.length.toLocaleString('vi-VN')}</strong> dòng /{' '}
-            {sourceTotals.totalRows.toLocaleString('vi-VN')} dòng nguồn tổng
+            Hiển thị <strong>{workers.length.toLocaleString("vi-VN")}</strong>{" "}
+            dòng / {sourceTotals.totalRows.toLocaleString("vi-VN")} dòng nguồn
+            tổng
           </div>
         </div>
 
@@ -684,14 +809,17 @@ export default function WorkersPage() {
             current: currentPage,
             pageSize: pageSize,
             showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100', '200'],
+            pageSizeOptions: ["10", "20", "50", "100", "200"],
             onChange: (page, size) => {
               setCurrentPage(page);
               setPageSize(size);
             },
-            showTotal: (total, range) => `${range[0]} - ${range[1]} / ${total} dòng nguồn / lượt tuyển`,
+            showTotal: (total, range) =>
+              `${range[0]} - ${range[1]} / ${total} dòng nguồn / lượt tuyển`,
           }}
-          locale={{ emptyText: 'Không tìm thấy dòng phù hợp với bộ lọc hiện tại.' }}
+          locale={{
+            emptyText: "Không tìm thấy dòng phù hợp với bộ lọc hiện tại.",
+          }}
         />
       </Card>
 
@@ -701,9 +829,11 @@ export default function WorkersPage() {
           <div className="flex items-center justify-between pr-4">
             <div className="flex items-center gap-2">
               <span className="text-base font-bold text-slate-900">
-                {detailRecord?.sourceValues?.['Họ và tên'] || detailRecord?.fullName || 'Chi tiết hồ sơ'}
+                {detailRecord?.sourceValues?.["Họ và tên"] ||
+                  detailRecord?.fullName ||
+                  "Chi tiết hồ sơ"}
               </span>
-              {getStatusTag(detailRecord?.sourceValues?.['Tình trạng'])}
+              {getStatusTag(detailRecord?.sourceValues?.["Tình trạng"])}
             </div>
             {detailRecord?.workerId && (
               <a
@@ -728,9 +858,11 @@ export default function WorkersPage() {
                 message="Cảnh báo dữ liệu nguồn"
                 description={
                   <ul className="list-disc list-inside text-xs space-y-1 mt-1">
-                    {detailRecord.sourceWarnings.map((w: string, idx: number) => (
-                      <li key={idx}>{w}</li>
-                    ))}
+                    {detailRecord.sourceWarnings.map(
+                      (w: string, idx: number) => (
+                        <li key={idx}>{w}</li>
+                      ),
+                    )}
                   </ul>
                 }
               />
@@ -743,25 +875,45 @@ export default function WorkersPage() {
               </h4>
               <Descriptions column={{ xs: 1, sm: 2 }} size="small" bordered>
                 <Descriptions.Item label="Họ và tên">
-                  <strong>{detailRecord.sourceValues?.['Họ và tên'] || detailRecord.fullName || '—'}</strong>
+                  <strong>
+                    {detailRecord.sourceValues?.["Họ và tên"] ||
+                      detailRecord.fullName ||
+                      "—"}
+                  </strong>
                 </Descriptions.Item>
                 <Descriptions.Item label="Số CCCD">
-                  <span className="font-mono">{detailRecord.sourceValues?.['Số CCCD'] || detailRecord.idCard || '—'}</span>
+                  <span className="font-mono">
+                    {detailRecord.sourceValues?.["Số CCCD"] ||
+                      detailRecord.idCard ||
+                      "—"}
+                  </span>
                 </Descriptions.Item>
                 <Descriptions.Item label="Số điện thoại">
-                  <span className="font-mono">{detailRecord.sourceValues?.['SĐT'] || detailRecord.phone || '—'}</span>
+                  <span className="font-mono">
+                    {detailRecord.sourceValues?.["SĐT"] ||
+                      detailRecord.phone ||
+                      "—"}
+                  </span>
                 </Descriptions.Item>
                 <Descriptions.Item label="Ngày sinh">
-                  {detailRecord.sourceValues?.['Ngày sinh'] || detailRecord.dob || '—'}
+                  {detailRecord.sourceValues?.["Ngày sinh"] ||
+                    detailRecord.dob ||
+                    "—"}
                 </Descriptions.Item>
                 <Descriptions.Item label="Giới tính">
-                  {detailRecord.sourceValues?.['Giới tính'] || detailRecord.gender || '—'}
+                  {detailRecord.sourceValues?.["Giới tính"] ||
+                    detailRecord.gender ||
+                    "—"}
                 </Descriptions.Item>
                 <Descriptions.Item label="Ngày cấp CCCD">
-                  {detailRecord.sourceValues?.['Ngày cấp'] || detailRecord.idCardDate || '—'}
+                  {detailRecord.sourceValues?.["Ngày cấp"] ||
+                    detailRecord.idCardDate ||
+                    "—"}
                 </Descriptions.Item>
                 <Descriptions.Item label="Địa chỉ / Quê quán" span={2}>
-                  {detailRecord.sourceValues?.['Địa chỉ'] || detailRecord.address || '—'}
+                  {detailRecord.sourceValues?.["Địa chỉ"] ||
+                    detailRecord.address ||
+                    "—"}
                 </Descriptions.Item>
               </Descriptions>
             </div>
@@ -773,25 +925,25 @@ export default function WorkersPage() {
               </h4>
               <Descriptions column={{ xs: 1, sm: 2 }} size="small" bordered>
                 <Descriptions.Item label="Nhà máy PV">
-                  {detailRecord.sourceValues?.['Nhà máy PV'] || '—'}
+                  {detailRecord.sourceValues?.["Nhà máy PV"] || "—"}
                 </Descriptions.Item>
                 <Descriptions.Item label="Ngày phỏng vấn">
-                  {detailRecord.sourceValues?.['Ngày PV'] || '—'}
+                  {detailRecord.sourceValues?.["Ngày PV"] || "—"}
                 </Descriptions.Item>
                 <Descriptions.Item label="Chuyên viên tuyển dụng">
-                  {detailRecord.sourceValues?.['Tuyển dụng'] || '—'}
+                  {detailRecord.sourceValues?.["Tuyển dụng"] || "—"}
                 </Descriptions.Item>
                 <Descriptions.Item label="Đón xe + KTX">
-                  {detailRecord.sourceValues?.['Đón xe + KTX'] || '—'}
+                  {detailRecord.sourceValues?.["Đón xe + KTX"] || "—"}
                 </Descriptions.Item>
                 <Descriptions.Item label="Tình trạng đào tạo">
-                  {detailRecord.sourceValues?.['Tình trạng đào tạo'] || '—'}
+                  {detailRecord.sourceValues?.["Tình trạng đào tạo"] || "—"}
                 </Descriptions.Item>
                 <Descriptions.Item label="Ngày ĐT dự kiến">
-                  {detailRecord.sourceValues?.['Ngày Đào tạo dự kiến'] || '—'}
+                  {detailRecord.sourceValues?.["Ngày Đào tạo dự kiến"] || "—"}
                 </Descriptions.Item>
                 <Descriptions.Item label="Ngày ĐT chuẩn" span={2}>
-                  {detailRecord.sourceValues?.['Ngày đào tạo chuẩn'] || '—'}
+                  {detailRecord.sourceValues?.["Ngày đào tạo chuẩn"] || "—"}
                 </Descriptions.Item>
               </Descriptions>
             </div>
@@ -803,30 +955,34 @@ export default function WorkersPage() {
               </h4>
               <Descriptions column={{ xs: 1, sm: 2 }} size="small" bordered>
                 <Descriptions.Item label="Nhà máy làm việc">
-                  {detailRecord.sourceValues?.['Nhà máy làm việc'] || '—'}
+                  {detailRecord.sourceValues?.["Nhà máy làm việc"] || "—"}
                 </Descriptions.Item>
                 <Descriptions.Item label="Mã nhân viên">
-                  <span className="font-mono">{detailRecord.sourceValues?.['Mã NV'] || '—'}</span>
+                  <span className="font-mono">
+                    {detailRecord.sourceValues?.["Mã NV"] || "—"}
+                  </span>
                 </Descriptions.Item>
                 <Descriptions.Item label="Loại hợp đồng">
-                  {detailRecord.sourceValues?.['Loại HĐ'] ||
-                    detailRecord.sourceValues?.['Loại HD'] ||
+                  {detailRecord.sourceValues?.["Loại HĐ"] ||
+                    detailRecord.sourceValues?.["Loại HD"] ||
                     detailRecord.assignments?.[0]?.contractType ||
-                    '—'}
+                    "—"}
                 </Descriptions.Item>
                 <Descriptions.Item label="Tháng nhận việc">
-                  <span className="font-semibold">{detailRecord.sourceValues?.['Tháng nhận việc'] || '—'}</span>
+                  <span className="font-semibold">
+                    {detailRecord.sourceValues?.["Tháng nhận việc"] || "—"}
+                  </span>
                 </Descriptions.Item>
                 <Descriptions.Item label="Tình trạng">
-                  {getStatusTag(detailRecord.sourceValues?.['Tình trạng'])}
+                  {getStatusTag(detailRecord.sourceValues?.["Tình trạng"])}
                 </Descriptions.Item>
                 <Descriptions.Item label="Ngày nghỉ việc (Ngày NH)">
                   <span className="text-rose-600 font-medium">
-                    {detailRecord.sourceValues?.['Ngày NH'] || '—'}
+                    {detailRecord.sourceValues?.["Ngày NH"] || "—"}
                   </span>
                 </Descriptions.Item>
                 <Descriptions.Item label="Lý do nghỉ việc" span={2}>
-                  {detailRecord.sourceValues?.['Lý do'] || '—'}
+                  {detailRecord.sourceValues?.["Lý do"] || "—"}
                 </Descriptions.Item>
               </Descriptions>
             </div>
@@ -835,7 +991,8 @@ export default function WorkersPage() {
             {detailRecord.rewardSource?.length > 0 && (
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 border-b pb-1">
-                  4. Dữ liệu thưởng đối chiếu từ Excel ({detailRecord.rewardSource.length} dòng)
+                  4. Dữ liệu thưởng đối chiếu từ Excel (
+                  {detailRecord.rewardSource.length} dòng)
                 </h4>
                 <Table
                   size="small"
@@ -843,16 +1000,30 @@ export default function WorkersPage() {
                   rowKey="id"
                   dataSource={detailRecord.rewardSource}
                   columns={[
-                    { title: 'Công ty', dataIndex: ['values', 'Công ty'], key: 'co' },
-                    { title: 'Ngày PV', dataIndex: ['values', 'Ngày PV'], key: 'pv' },
-                    { title: 'Chính sách', dataIndex: ['values', 'Chính sách'], key: 'po' },
                     {
-                      title: 'Các mốc thưởng',
-                      key: 'bonuses',
+                      title: "Công ty",
+                      dataIndex: ["values", "Công ty"],
+                      key: "co",
+                    },
+                    {
+                      title: "Ngày PV",
+                      dataIndex: ["values", "Ngày PV"],
+                      key: "pv",
+                    },
+                    {
+                      title: "Chính sách",
+                      dataIndex: ["values", "Chính sách"],
+                      key: "po",
+                    },
+                    {
+                      title: "Các mốc thưởng",
+                      key: "bonuses",
                       render: (_: any, r: any) => {
-                        const items = Array.from({ length: 7 }, (_, i) => r.values?.[`Thưởng lần ${i + 1}`])
-                          .filter(Boolean);
-                        return items.length ? items.join(' · ') : '—';
+                        const items = Array.from(
+                          { length: 7 },
+                          (_, i) => r.values?.[`Thưởng lần ${i + 1}`],
+                        ).filter(Boolean);
+                        return items.length ? items.join(" · ") : "—";
                       },
                     },
                   ]}
@@ -903,7 +1074,9 @@ export default function WorkersPage() {
         onCancel={() => setHistoryWorker(null)}
         footer={
           <div className="flex justify-between items-center pt-2">
-            <span className="text-xs text-slate-500 font-mono">CCCD: {historyWorker?.idCard}</span>
+            <span className="text-xs text-slate-500 font-mono">
+              CCCD: {historyWorker?.idCard}
+            </span>
             <div className="flex gap-2">
               <Button onClick={() => setHistoryWorker(null)}>Đóng</Button>
               <Button type="primary" href={`/workers/${historyWorker?.id}`}>
@@ -917,16 +1090,28 @@ export default function WorkersPage() {
         <div className="space-y-4 my-2">
           <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-xs flex flex-wrap gap-4 text-slate-700">
             <span>
-              Họ và tên: <strong className="text-slate-900">{historyWorker?.fullName}</strong>
+              Họ và tên:{" "}
+              <strong className="text-slate-900">
+                {historyWorker?.fullName}
+              </strong>
             </span>
             <span>
-              CCCD: <strong className="font-mono text-blue-800">{historyWorker?.idCard}</strong>
+              CCCD:{" "}
+              <strong className="font-mono text-blue-800">
+                {historyWorker?.idCard}
+              </strong>
             </span>
             <span>
-              SĐT: <strong className="font-mono text-slate-800">{historyWorker?.phone || '—'}</strong>
+              SĐT:{" "}
+              <strong className="font-mono text-slate-800">
+                {historyWorker?.phone || "—"}
+              </strong>
             </span>
             <span>
-              Quê quán: <strong className="text-slate-800">{historyWorker?.province || '—'}</strong>
+              Quê quán:{" "}
+              <strong className="text-slate-800">
+                {historyWorker?.province || "—"}
+              </strong>
             </span>
           </div>
 
@@ -937,65 +1122,79 @@ export default function WorkersPage() {
             pagination={false}
             bordered
             size="small"
-            locale={{ emptyText: 'Không có dòng phù hợp. Hãy kiểm tra bộ lọc hoặc chuyển nhóm hồ sơ.' }}
+            locale={{
+              emptyText:
+                "Không có dòng phù hợp. Hãy kiểm tra bộ lọc hoặc chuyển nhóm hồ sơ.",
+            }}
             columns={[
               {
-                title: 'STT',
-                key: 'idx',
+                title: "STT",
+                key: "idx",
                 width: 50,
-                align: 'center' as const,
-                render: (_: any, __: any, index: number) => (historyWorker?.assignments?.length || 0) - index,
+                align: "center" as const,
+                render: (_: any, __: any, index: number) =>
+                  (historyWorker?.assignments?.length || 0) - index,
               },
               {
-                title: 'Công Ty / Nhà Máy',
-                key: 'factory',
+                title: "Công Ty / Nhà Máy",
+                key: "factory",
                 render: (_: any, a: any) => (
                   <div>
-                    <div className="font-bold text-slate-800">{a.workingFactory || a.interviewFactory}</div>
-                    <div className="text-[11px] text-slate-400">Đơn hàng: {a.order?.name || 'Mặc định'}</div>
+                    <div className="font-bold text-slate-800">
+                      {a.workingFactory || a.interviewFactory}
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      Đơn hàng: {a.order?.name || "Mặc định"}
+                    </div>
                   </div>
                 ),
               },
               {
-                title: 'Thời Gian Làm Việc',
-                key: 'timeline',
+                title: "Thời Gian Làm Việc",
+                key: "timeline",
                 render: (_: any, a: any) => (
                   <div className="text-xs">
                     <div>
-                      PV/Bắt đầu:{' '}
+                      PV/Bắt đầu:{" "}
                       <strong className="text-slate-700">
-                        {a.startDate || a.passedDate || a.interviewDate || '—'}
+                        {a.startDate || a.passedDate || a.interviewDate || "—"}
                       </strong>
                     </div>
-                    {a.leaveDate && <div className="text-rose-600 font-medium">Nghỉ: {a.leaveDate}</div>}
-                  </div>
-                ),
-              },
-              {
-                title: 'Tình Trạng & Lý Do Nghỉ',
-                key: 'status',
-                render: (_: any, a: any) => (
-                  <div>
-                    <Tag
-                      color={
-                        a.status === 'Đang làm việc'
-                          ? 'success'
-                          : a.status === 'Đã nghỉ việc'
-                          ? 'error'
-                          : 'default'
-                      }
-                    >
-                      {a.status}
-                    </Tag>
-                    {a.leaveReason && (
-                      <div className="text-[11px] text-rose-600 mt-1">Lý do: {a.leaveReason}</div>
+                    {a.leaveDate && (
+                      <div className="text-rose-600 font-medium">
+                        Nghỉ: {a.leaveDate}
+                      </div>
                     )}
                   </div>
                 ),
               },
               {
-                title: 'Thưởng Đã Nhận',
-                key: 'bonus',
+                title: "Tình Trạng & Lý Do Nghỉ",
+                key: "status",
+                render: (_: any, a: any) => (
+                  <div>
+                    <Tag
+                      color={
+                        a.status === "Đang làm việc"
+                          ? "success"
+                          : a.status === "Đã nghỉ việc"
+                            ? "error"
+                            : "default"
+                      }
+                    >
+                      {a.status}
+                    </Tag>
+                    {a.leaveReason && (
+                      <div className="text-[11px] text-rose-600 mt-1">
+                        Lý do: {a.leaveReason}
+                      </div>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                title: "Thưởng Đã Nhận",
+                key: "bonus",
                 render: (_: any, a: any) => {
                   const pTotal = (a.enrollments || []).reduce(
                     (sum: number, e: any) =>
@@ -1003,19 +1202,22 @@ export default function WorkersPage() {
                       (e.stages || []).reduce(
                         (sSum: number, s: any) =>
                           sSum +
-                          (s.payments || []).reduce((pSum: number, p: any) => pSum + (p.amount || 0), 0),
-                        0
+                          (s.payments || []).reduce(
+                            (pSum: number, p: any) => pSum + (p.amount || 0),
+                            0,
+                          ),
+                        0,
                       ),
-                    0
+                    0,
                   );
                   const bTotal = (a.bonusRecords || []).reduce(
                     (sum: number, b: any) => sum + (b.totalBonus || 0),
-                    0
+                    0,
                   );
                   const total = pTotal > 0 ? pTotal : bTotal;
                   return total > 0 ? (
                     <span className="font-bold text-emerald-700 text-xs">
-                      {total.toLocaleString('vi-VN')} đ
+                      {total.toLocaleString("vi-VN")} đ
                     </span>
                   ) : (
                     <span className="text-slate-400 text-xs">—</span>
@@ -1023,10 +1225,12 @@ export default function WorkersPage() {
                 },
               },
               {
-                title: 'Tuyển Dụng',
-                dataIndex: 'recruiter',
-                key: 'recruiter',
-                render: (text: string) => <span className="text-xs text-slate-600">{text || '—'}</span>,
+                title: "Tuyển Dụng",
+                dataIndex: "recruiter",
+                key: "recruiter",
+                render: (text: string) => (
+                  <span className="text-xs text-slate-600">{text || "—"}</span>
+                ),
               },
             ]}
           />
@@ -1035,7 +1239,11 @@ export default function WorkersPage() {
 
       {/* Modal Thêm Mới Hồ Sơ */}
       <Modal
-        title={rehire ? 'Tái tuyển dụng — giữ lịch sử hồ sơ' : 'Thêm Mới Hồ Sơ Lao Động (DS_TONG)'}
+        title={
+          rehire
+            ? "Tái tuyển dụng — giữ lịch sử hồ sơ"
+            : "Thêm Mới Hồ Sơ Lao Động (DS_TONG)"
+        }
         open={isAddModalOpen}
         onCancel={() => setIsAddModalOpen(false)}
         footer={null}
@@ -1046,9 +1254,9 @@ export default function WorkersPage() {
           layout="vertical"
           onFinish={handleAddWorker}
           initialValues={{
-            interviewFactory: 'Luxshare QC',
-            contractType: 'Thời vụ',
-            status: 'Đang chờ phỏng vấn',
+            interviewFactory: "Luxshare QC",
+            contractType: "Thời vụ",
+            status: "Đang chờ phỏng vấn",
           }}
           className="mt-4"
         >
@@ -1056,7 +1264,7 @@ export default function WorkersPage() {
             <Form.Item
               name="fullName"
               label="Họ và Tên"
-              rules={[{ required: true, message: 'Vui lòng nhập Họ và Tên' }]}
+              rules={[{ required: true, message: "Vui lòng nhập Họ và Tên" }]}
             >
               <Input placeholder="Nguyễn Văn A" />
             </Form.Item>
@@ -1065,8 +1273,11 @@ export default function WorkersPage() {
               name="idCard"
               label="Số CCCD / CMT (Bắt buộc)"
               rules={[
-                { required: true, message: 'Vui lòng nhập số CCCD' },
-                { pattern: /^(\d{9}|\d{12})$/, message: 'CCCD 12 số hoặc CMT cũ 9 số' },
+                { required: true, message: "Vui lòng nhập số CCCD" },
+                {
+                  pattern: /^(\d{9}|\d{12})$/,
+                  message: "CCCD 12 số hoặc CMT cũ 9 số",
+                },
               ]}
               extra="Hệ thống tự động chặn trùng CCCD với toàn bộ dữ liệu cũ"
             >
@@ -1084,8 +1295,8 @@ export default function WorkersPage() {
             <Form.Item name="gender" label="Giới Tính">
               <Select
                 options={[
-                  { label: 'Nam', value: 'Nam' },
-                  { label: 'Nữ', value: 'Nữ' },
+                  { label: "Nam", value: "Nam" },
+                  { label: "Nữ", value: "Nữ" },
                 ]}
               />
             </Form.Item>
@@ -1095,11 +1306,15 @@ export default function WorkersPage() {
             </Form.Item>
 
             <Form.Item name="interviewFactory" label="Nhà Máy Phỏng Vấn">
-              <Select options={FACTORIES.map((f) => ({ label: f, value: f }))} />
+              <Select
+                options={FACTORIES.map((f) => ({ label: f, value: f }))}
+              />
             </Form.Item>
 
             <Form.Item name="status" label="Tình Trạng">
-              <Select options={STATUSES.map((value) => ({ value, label: value }))} />
+              <Select
+                options={STATUSES.map((value) => ({ value, label: value }))}
+              />
             </Form.Item>
 
             <Form.Item name="recruiter" label="Chuyên Viên Tuyển Dụng">
@@ -1118,19 +1333,19 @@ export default function WorkersPage() {
               <Input placeholder="T10.2026" />
             </Form.Item>
             {[
-              'code',
-              'idCardDate',
-              'idCardPlace',
-              'province',
-              'team',
-              'workingFactory',
-              'contractType',
-              'shuttleBusKtx',
-              'interviewDate',
-              'expectedTrainingDate',
-              'expectedTrainingStatus',
-              'leaveDate',
-              'leaveReason',
+              "code",
+              "idCardDate",
+              "idCardPlace",
+              "province",
+              "team",
+              "workingFactory",
+              "contractType",
+              "shuttleBusKtx",
+              "interviewDate",
+              "expectedTrainingDate",
+              "expectedTrainingStatus",
+              "leaveDate",
+              "leaveReason",
             ].map((name) => (
               <Form.Item
                 key={name}
@@ -1138,19 +1353,19 @@ export default function WorkersPage() {
                 label={
                   (
                     {
-                      code: 'Mã NV',
-                      idCardDate: 'Ngày cấp',
-                      idCardPlace: 'Nơi cấp',
-                      province: 'Tỉnh/Thành',
-                      team: 'Đội nhóm',
-                      workingFactory: 'Nhà máy làm việc',
-                      contractType: 'Loại hợp đồng',
-                      shuttleBusKtx: 'Đón xe / KTX',
-                      interviewDate: 'Ngày PV',
-                      expectedTrainingDate: 'Ngày đào tạo dự kiến',
-                      expectedTrainingStatus: 'Tình trạng đào tạo',
-                      leaveDate: 'Ngày nghỉ (nếu đã nghỉ)',
-                      leaveReason: 'Lý do nghỉ (nếu đã nghỉ)',
+                      code: "Mã NV",
+                      idCardDate: "Ngày cấp",
+                      idCardPlace: "Nơi cấp",
+                      province: "Tỉnh/Thành",
+                      team: "Đội nhóm",
+                      workingFactory: "Nhà máy làm việc",
+                      contractType: "Loại hợp đồng",
+                      shuttleBusKtx: "Đón xe / KTX",
+                      interviewDate: "Ngày PV",
+                      expectedTrainingDate: "Ngày đào tạo dự kiến",
+                      expectedTrainingStatus: "Tình trạng đào tạo",
+                      leaveDate: "Ngày nghỉ (nếu đã nghỉ)",
+                      leaveReason: "Lý do nghỉ (nếu đã nghỉ)",
                     } as Record<string, string>
                   )[name]
                 }
@@ -1177,31 +1392,36 @@ export default function WorkersPage() {
         onCancel={() => setIsStatusModalOpen(false)}
         footer={null}
       >
-        <Form form={statusForm} layout="vertical" onFinish={handleUpdateStatus} className="mt-4">
+        <Form
+          form={statusForm}
+          layout="vertical"
+          onFinish={handleUpdateStatus}
+          className="mt-4"
+        >
           <AssignmentFields form={statusForm} showWorkDays />
           <div className="grid grid-cols-2 gap-3">
             {Object.entries({
-              fullName: 'Họ tên',
-              phone: 'SĐT',
-              dob: 'Ngày sinh',
-              gender: 'Giới tính',
-              code: 'Mã NV',
-              idCardDate: 'Ngày cấp',
-              idCardPlace: 'Nơi cấp',
-              address: 'Địa chỉ',
-              province: 'Tỉnh/Thành',
-              team: 'Đội nhóm',
-              recruiter: 'Tuyển dụng',
-              source: 'Nguồn',
-              interviewFactory: 'Nhà máy PV',
-              workingFactory: 'Nhà máy làm việc',
-              contractType: 'Loại hợp đồng',
-              shuttleBusKtx: 'Đón xe / KTX',
-              interviewDate: 'Ngày PV',
-              expectedTrainingDate: 'Ngày đào tạo dự kiến',
-              expectedTrainingStatus: 'Tình trạng đào tạo dự kiến',
-              standardTrainingDate: 'Ngày đào tạo chuẩn',
-              onboardingMonth: 'Tháng nhận việc',
+              fullName: "Họ tên",
+              phone: "SĐT",
+              dob: "Ngày sinh",
+              gender: "Giới tính",
+              code: "Mã NV",
+              idCardDate: "Ngày cấp",
+              idCardPlace: "Nơi cấp",
+              address: "Địa chỉ",
+              province: "Tỉnh/Thành",
+              team: "Đội nhóm",
+              recruiter: "Tuyển dụng",
+              source: "Nguồn",
+              interviewFactory: "Nhà máy PV",
+              workingFactory: "Nhà máy làm việc",
+              contractType: "Loại hợp đồng",
+              shuttleBusKtx: "Đón xe / KTX",
+              interviewDate: "Ngày PV",
+              expectedTrainingDate: "Ngày đào tạo dự kiến",
+              expectedTrainingStatus: "Tình trạng đào tạo dự kiến",
+              standardTrainingDate: "Ngày đào tạo chuẩn",
+              onboardingMonth: "Tháng nhận việc",
             }).map(([name, label]) => (
               <Form.Item key={name} name={name} label={label}>
                 <Input />
@@ -1209,20 +1429,29 @@ export default function WorkersPage() {
             ))}
           </div>
           <Form.Item name="status" label="Tình Trạng Làm Việc">
-            <Select options={STATUSES.map((value) => ({ value, label: value }))} />
+            <Select
+              options={STATUSES.map((value) => ({ value, label: value }))}
+            />
           </Form.Item>
 
           <Form.Item
             noStyle
-            shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}
+            shouldUpdate={(prevValues, currentValues) =>
+              prevValues.status !== currentValues.status
+            }
           >
             {({ getFieldValue }) =>
-              getFieldValue('status') === 'Đã nghỉ việc' ? (
+              getFieldValue("status") === "Đã nghỉ việc" ? (
                 <>
                   <Form.Item
                     name="leaveDate"
                     label="Ngày NH (Ngày Nghỉ Việc)"
-                    rules={[{ required: true, message: 'Vui lòng nhập Ngày nghỉ việc' }]}
+                    rules={[
+                      {
+                        required: true,
+                        message: "Vui lòng nhập Ngày nghỉ việc",
+                      },
+                    ]}
                     extra="Ghi nhận ngày làm việc cuối cùng tại xưởng"
                   >
                     <Input placeholder="VD: 25/01/2026" />
@@ -1231,16 +1460,33 @@ export default function WorkersPage() {
                   <Form.Item
                     name="leaveReason"
                     label="Lý Do Nghỉ Việc"
-                    rules={[{ required: true, message: 'Vui lòng nhập lý do nghỉ việc' }]}
+                    rules={[
+                      {
+                        required: true,
+                        message: "Vui lòng nhập lý do nghỉ việc",
+                      },
+                    ]}
                   >
                     <Select
                       options={[
-                        { label: 'Việc gia đình', value: 'Việc gia đình' },
-                        { label: 'Lương thưởng không phù hợp', value: 'Lương thưởng không phù hợp' },
-                        { label: 'Sức khỏe không đảm bảo', value: 'Sức khỏe không đảm bảo' },
-                        { label: 'Vi phạm kỷ luật / Tự ý bỏ việc', value: 'Vi phạm kỷ luật' },
-                        { label: 'Hết hạn hợp đồng', value: 'Hết hạn hợp đồng' },
-                        { label: 'Khác', value: 'Khác' },
+                        { label: "Việc gia đình", value: "Việc gia đình" },
+                        {
+                          label: "Lương thưởng không phù hợp",
+                          value: "Lương thưởng không phù hợp",
+                        },
+                        {
+                          label: "Sức khỏe không đảm bảo",
+                          value: "Sức khỏe không đảm bảo",
+                        },
+                        {
+                          label: "Vi phạm kỷ luật / Tự ý bỏ việc",
+                          value: "Vi phạm kỷ luật",
+                        },
+                        {
+                          label: "Hết hạn hợp đồng",
+                          value: "Hết hạn hợp đồng",
+                        },
+                        { label: "Khác", value: "Khác" },
                       ]}
                     />
                   </Form.Item>

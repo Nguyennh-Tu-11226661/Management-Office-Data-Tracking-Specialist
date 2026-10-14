@@ -19,14 +19,14 @@ Không có ngày chi/chứng từ để kiểm chứng độc lập tiền đã 
 Kiểm thử: tests/source-format.cjs và npm test đạt; TypeScript đạt. Chưa chạy kiểm thử HTTP toàn bộ import dữ liệu thật. Các lỗi khác trong báo cáo rà soát chưa mặc nhiên được xử lý.
 
 ## Trang DS_THUONG theo Excel
+
 - Hiển thị STT, Công ty, Tháng gốc, Ngày PV, Chính sách, Mã nhân viên, Họ tên, CCCD, STK, Ngân hàng, đầy đủ Thưởng lần 1–7, tổng tiền và nguồn.
 - Nguyên văn mốc thưởng nguồn được lấy từ note nguồn, không gắn nhãn 3/7/15/30 công cố định. Hiện vật và các trạng thái không đạt/không có chính sách không biến thành tiền.
 - Mặc định tất cả tháng; bảng cuộn ngang. Thưởng nguồn hiện Đã trả theo Excel, không dùng nút sửa/duyệt nội bộ trên các dòng nguồn.
 - Import mới lưu snapshot các cột nguồn để đối chiếu cả STK/ngân hàng; bản nhập từ trước khi bổ sung snapshot vẫn có nội dung mốc đã lưu, STK thiếu snapshot hiển thị theo hồ sơ nếu duy nhất một tài khoản.
 
-
 ## Mở demo cục bộ không qua đăng nhập
+
 - Chế độ local auto-view bật bằng .local/auto-open-demo.json, chỉ áp dụng Host localhost/127.0.0.1 cổng 3005; mở /login sẽ chuyển về tổng quan.
 - Quyền xem VIEWER, không cấp quyền sửa dữ liệu/tài khoản. Khi tắt chế độ hoặc dùng host khác vẫn yêu cầu xác thực.
 - Không thay file tài khoản, không gửi dữ liệu cho khách hoặc triển khai ngoài máy. TypeScript, npm test và tests/local-auto-view.cjs đạt.
-

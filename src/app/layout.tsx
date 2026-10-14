@@ -1,14 +1,15 @@
-import type { Metadata } from 'next';
-import './globals.css';
-import AntdRegistry from '@/components/AntdRegistry';
-import AuthGate from '@/components/AuthGate';
-import Navigation from '@/components/Navigation';
-import { ConfigProvider } from 'antd';
-import viVN from 'antd/locale/vi_VN';
+import type { Metadata } from "next";
+import "./globals.css";
+import AntdRegistry from "@/components/AntdRegistry";
+import AuthGate from "@/components/AuthGate";
+import Navigation from "@/components/Navigation";
+import { ConfigProvider } from "antd";
+import viVN from "antd/locale/vi_VN";
 
 export const metadata: Metadata = {
-  title: 'L-Incentive v2.0 - Quản Trị Lao Động & Định Mức Thưởng 2026',
-  description: 'Hệ thống Quản Trị Lao Động, Định Mức Công, Xác Thực STK & Chi Trả Thưởng',
+  title: "L-Incentive v2.0 - Quản Trị Lao Động & Định Mức Thưởng 2026",
+  description:
+    "Hệ thống Quản Trị Lao Động, Định Mức Công, Xác Thực STK & Chi Trả Thưởng",
 };
 
 export default function RootLayout({
@@ -24,10 +25,10 @@ export default function RootLayout({
             locale={viVN}
             theme={{
               token: {
-                colorPrimary: '#2563eb',
+                colorPrimary: "#2563eb",
                 borderRadius: 10,
-                fontFamily: 'inherit',
-                colorBgContainer: '#ffffff',
+                fontFamily: "inherit",
+                colorBgContainer: "#ffffff",
               },
               components: {
                 Card: {
