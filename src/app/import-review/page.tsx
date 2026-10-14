@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Alert,
   Button,
@@ -13,8 +13,8 @@ import {
   Tooltip,
   Badge,
   message,
-} from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+} from "antd";
+import type { ColumnsType } from "antd/es/table";
 import {
   AlertCircle,
   AlertTriangle,
@@ -27,7 +27,7 @@ import {
   Info,
   Building2,
   Calendar,
-} from 'lucide-react';
+} from "lucide-react";
 
 interface Issue {
   row: number;
@@ -54,131 +54,164 @@ interface IssueExplanation {
   solution: string;
 }
 
-function explainIssue(rawMessage: string, values: Record<string, any> = {}): IssueExplanation {
-  const msg = rawMessage.replace(/^Dòng \d+:\s*/, '').trim();
+function explainIssue(
+  rawMessage: string,
+  values: Record<string, any> = {},
+): IssueExplanation {
+  const msg = rawMessage.replace(/^Dòng \d+:\s*/, "").trim();
 
-  if (msg.includes('CHƯA BÁO NGHỈ') || msg.includes('CCCD có đợt Đang làm việc') || msg.includes('trùng CCCD đang hoạt động')) {
+  if (
+    msg.includes("CHƯA BÁO NGHỈ") ||
+    msg.includes("CCCD có đợt Đang làm việc") ||
+    msg.includes("trùng CCCD đang hoạt động")
+  ) {
     return {
-      category: 'Đang làm xưởng khác (Chưa báo nghỉ)',
-      color: 'red',
-      badge: '🚨 Chưa báo nghỉ',
-      title: 'Đang làm việc tại xưởng khác (Chưa báo nghỉ)',
+      category: "Đang làm xưởng khác (Chưa báo nghỉ)",
+      color: "red",
+      badge: "🚨 Chưa báo nghỉ",
+      title: "Đang làm việc tại xưởng khác (Chưa báo nghỉ)",
       detail: msg,
-      solution: 'Liên hệ ngay xưởng cũ để kiểm tra thủ tục nghỉ việc trước khi tiếp nhận tại xưởng mới.',
+      solution:
+        "Liên hệ ngay xưởng cũ để kiểm tra thủ tục nghỉ việc trước khi tiếp nhận tại xưởng mới.",
     };
   }
 
-  if (msg.includes('SĐT ĐANG HOẠT ĐỘNG') || msg.includes('SĐT trùng hồ sơ đang hoạt động')) {
+  if (
+    msg.includes("SĐT ĐANG HOẠT ĐỘNG") ||
+    msg.includes("SĐT trùng hồ sơ đang hoạt động")
+  ) {
     return {
-      category: 'SĐT đang hoạt động xưởng khác',
-      color: 'volcano',
-      badge: '⚠️ SĐT đang hoạt động',
-      title: 'Số điện thoại đang gắn với công nhân tại xưởng khác',
+      category: "SĐT đang hoạt động xưởng khác",
+      color: "volcano",
+      badge: "⚠️ SĐT đang hoạt động",
+      title: "Số điện thoại đang gắn với công nhân tại xưởng khác",
       detail: msg,
-      solution: 'Xác minh danh tính người sở hữu số điện thoại để tránh đăng ký nhầm hoặc nhảy xưởng.',
+      solution:
+        "Xác minh danh tính người sở hữu số điện thoại để tránh đăng ký nhầm hoặc nhảy xưởng.",
     };
   }
 
-  if (msg.includes('Không xác định duy nhất đợt theo CCCD, công ty, ngày PV và mã NV')) {
-    const factory = values['Công ty'] || values['Nhà máy PV'] || values['Nhà máy làm việc'] || '';
-    const interviewDate = values['Ngày PV'] || values['Ngày phỏng vấn'] || '';
+  if (
+    msg.includes(
+      "Không xác định duy nhất đợt theo CCCD, công ty, ngày PV và mã NV",
+    )
+  ) {
+    const factory =
+      values["Công ty"] ||
+      values["Nhà máy PV"] ||
+      values["Nhà máy làm việc"] ||
+      "";
+    const interviewDate = values["Ngày PV"] || values["Ngày phỏng vấn"] || "";
     return {
-      category: 'Lệch đợt tuyển dụng',
-      color: 'orange',
-      badge: 'Lệch hồ sơ',
-      title: `Lệch hồ sơ: File ghi "${factory || 'Chưa rõ nhà máy'}" (Ngày PV: ${interviewDate || 'Trống'})`,
+      category: "Lệch đợt tuyển dụng",
+      color: "orange",
+      badge: "Lệch hồ sơ",
+      title: `Lệch hồ sơ: File ghi "${factory || "Chưa rõ nhà máy"}" (Ngày PV: ${interviewDate || "Trống"})`,
       detail: `File Thưởng ghi nhà máy "${factory}", ngày PV "${interviewDate}". Tuy nhiên trong danh sách tuyển dụng gốc (DS_TONG) không có đợt tuyển tương ứng hoặc ghi nhà máy làm việc khác (VD: Nam Sơn thay vì Goertek).`,
-      solution: 'Kiểm tra công nhân có đổi nhà máy làm việc thực tế hoặc cập nhật ngày PV trong DS_TONG.',
+      solution:
+        "Kiểm tra công nhân có đổi nhà máy làm việc thực tế hoặc cập nhật ngày PV trong DS_TONG.",
     };
   }
 
-  if (msg.includes('Bản thưởng của đợt đã có; không tự ghi đè')) {
-    const month = values['Tháng'] || '';
+  if (msg.includes("Bản thưởng của đợt đã có; không tự ghi đè")) {
+    const month = values["Tháng"] || "";
     return {
-      category: 'Trùng bản ghi thưởng',
-      color: 'red',
-      badge: 'Trùng CSDL',
-      title: `Đã có bản thưởng ${month ? `(${month})` : 'đợt này'} trong CSDL`,
+      category: "Trùng bản ghi thưởng",
+      color: "red",
+      badge: "Trùng CSDL",
+      title: `Đã có bản thưởng ${month ? `(${month})` : "đợt này"} trong CSDL`,
       detail: `Công nhân này đã có tiền thưởng ${month} từ file nạp trước đó. Hệ thống chặn tự động ghi đè để bảo vệ tài chính không chi trùng 2 lần.`,
-      solution: 'Đối chiếu với bản ghi cũ tại màn hình Quản lý Thưởng để quyết định giữ hay cập nhật.',
+      solution:
+        "Đối chiếu với bản ghi cũ tại màn hình Quản lý Thưởng để quyết định giữ hay cập nhật.",
     };
   }
 
-  if (msg.includes('Thiếu số CCCD')) {
+  if (msg.includes("Thiếu số CCCD")) {
     return {
-      category: 'Thiếu CCCD',
-      color: 'magenta',
-      badge: 'Thiếu CCCD',
-      title: 'Không tìm thấy số CCCD hợp lệ',
-      detail: 'Dòng này bị trống cột CCCD hoặc file Thưởng - Phần 2 bị lệch hàng tiêu đề lúc nạp.',
-      solution: 'Kiểm tra lại file Excel gốc và bổ sung số CCCD của người lao động.',
+      category: "Thiếu CCCD",
+      color: "magenta",
+      badge: "Thiếu CCCD",
+      title: "Không tìm thấy số CCCD hợp lệ",
+      detail:
+        "Dòng này bị trống cột CCCD hoặc file Thưởng - Phần 2 bị lệch hàng tiêu đề lúc nạp.",
+      solution:
+        "Kiểm tra lại file Excel gốc và bổ sung số CCCD của người lao động.",
     };
   }
 
-  if (msg.includes('CCCD chưa có hồ sơ; nhập DS_TONG trước')) {
+  if (msg.includes("CCCD chưa có hồ sơ; nhập DS_TONG trước")) {
     return {
-      category: 'Chưa có DS_TONG',
-      color: 'volcano',
-      badge: 'Chưa có hồ sơ',
-      title: 'CCCD chưa tồn tại trong danh sách tuyển dụng',
-      detail: 'Hệ thống tìm không thấy người lao động có số CCCD này trong DS_TONG.',
-      solution: 'Cần nhập hồ sơ tuyển dụng vào DS_TONG trước khi nạp thưởng.',
+      category: "Chưa có DS_TONG",
+      color: "volcano",
+      badge: "Chưa có hồ sơ",
+      title: "CCCD chưa tồn tại trong danh sách tuyển dụng",
+      detail:
+        "Hệ thống tìm không thấy người lao động có số CCCD này trong DS_TONG.",
+      solution: "Cần nhập hồ sơ tuyển dụng vào DS_TONG trước khi nạp thưởng.",
     };
   }
 
-  if (msg.includes('giữ nguyên mã tình trạng nguồn') || msg.includes('chưa diễn giải')) {
+  if (
+    msg.includes("giữ nguyên mã tình trạng nguồn") ||
+    msg.includes("chưa diễn giải")
+  ) {
     const match = /giữ nguyên mã tình trạng nguồn ([^;]+);/.exec(msg);
-    const code = match ? match[1] : '';
+    const code = match ? match[1] : "";
     return {
-      category: 'Mã viết tắt',
-      color: 'blue',
-      badge: 'Mã nguồn',
+      category: "Mã viết tắt",
+      color: "blue",
+      badge: "Mã nguồn",
       title: `Trạng thái gốc viết tắt: "${code}"`,
       detail: `File Excel dùng ký hiệu viết tắt ("${code}"), hệ thống bảo lưu nguyên gốc để không mất dữ liệu.`,
-      solution: 'Có thể chuẩn hóa sang trạng thái chính quy (Đang làm việc, Đã nghỉ việc, Hết hạn hợp đồng).',
+      solution:
+        "Có thể chuẩn hóa sang trạng thái chính quy (Đang làm việc, Đã nghỉ việc, Hết hạn hợp đồng).",
     };
   }
 
-  if (msg.includes('Cần ngày nghỉ và lý do nghỉ việc')) {
+  if (msg.includes("Cần ngày nghỉ và lý do nghỉ việc")) {
     return {
-      category: 'Thiếu ngày nghỉ',
-      color: 'gold',
-      badge: 'Thiếu thông tin',
-      title: 'Ghi nghỉ việc nhưng thiếu Ngày nghỉ / Lý do',
-      detail: 'Hồ sơ ghi nhận nghỉ việc nhưng trên file Excel để trống cột Ngày nghỉ việc hoặc Lý do.',
-      solution: 'Bổ sung ngày làm việc cuối cùng và lý do người lao động nghỉ việc.',
+      category: "Thiếu ngày nghỉ",
+      color: "gold",
+      badge: "Thiếu thông tin",
+      title: "Ghi nghỉ việc nhưng thiếu Ngày nghỉ / Lý do",
+      detail:
+        "Hồ sơ ghi nhận nghỉ việc nhưng trên file Excel để trống cột Ngày nghỉ việc hoặc Lý do.",
+      solution:
+        "Bổ sung ngày làm việc cuối cùng và lý do người lao động nghỉ việc.",
     };
   }
 
-  if (msg.includes('Số điện thoại không hợp lệ')) {
+  if (msg.includes("Số điện thoại không hợp lệ")) {
     return {
-      category: 'SĐT sai định dạng',
-      color: 'cyan',
-      badge: 'SĐT sai',
-      title: 'Số điện thoại không đúng chuẩn 10 số',
-      detail: 'Số điện thoại trong file có thể thiếu chữ số hoặc chứa ký tự đặc biệt.',
-      solution: 'Kiểm tra và cập nhật lại số điện thoại liên lạc.',
+      category: "SĐT sai định dạng",
+      color: "cyan",
+      badge: "SĐT sai",
+      title: "Số điện thoại không đúng chuẩn 10 số",
+      detail:
+        "Số điện thoại trong file có thể thiếu chữ số hoặc chứa ký tự đặc biệt.",
+      solution: "Kiểm tra và cập nhật lại số điện thoại liên lạc.",
     };
   }
 
-  if (msg.includes('CCCD phải là Text')) {
+  if (msg.includes("CCCD phải là Text")) {
     return {
-      category: 'Định dạng CCCD',
-      color: 'purple',
-      badge: 'Kiểu dữ liệu',
-      title: 'Cột CCCD bị lưu dạng Số (Number)',
-      detail: 'Trong Excel cột CCCD bị lưu dạng Số nên có thể mất số 0 ở đầu (VD: 0012... bị thành 12...).',
-      solution: 'Định dạng lại cột CCCD sang dạng Text trước khi import.',
+      category: "Định dạng CCCD",
+      color: "purple",
+      badge: "Kiểu dữ liệu",
+      title: "Cột CCCD bị lưu dạng Số (Number)",
+      detail:
+        "Trong Excel cột CCCD bị lưu dạng Số nên có thể mất số 0 ở đầu (VD: 0012... bị thành 12...).",
+      solution: "Định dạng lại cột CCCD sang dạng Text trước khi import.",
     };
   }
 
   return {
-    category: 'Cảnh báo khác',
-    color: 'default',
-    badge: 'Cảnh báo',
+    category: "Cảnh báo khác",
+    color: "default",
+    badge: "Cảnh báo",
     title: msg,
     detail: msg,
-    solution: 'Kiểm tra đối chiếu với dòng tương ứng trong file Excel gốc.',
+    solution: "Kiểm tra đối chiếu với dòng tương ứng trong file Excel gốc.",
   };
 }
 
@@ -186,18 +219,18 @@ function explainIssue(rawMessage: string, values: Record<string, any> = {}): Iss
 function renderBonusOrProfile(v: Record<string, any>) {
   const activeRewards: { label: string; text: string }[] = [];
   for (let i = 1; i <= 7; i++) {
-    const val = String(v[`Thưởng lần ${i}`] || '').trim();
+    const val = String(v[`Thưởng lần ${i}`] || "").trim();
     if (val && !/ko có chính sách|ko đạt|không có|k có/i.test(val)) {
-      const cleanAmount = val.split('-')[0].trim();
+      const cleanAmount = val.split("-")[0].trim();
       activeRewards.push({ label: `L${i}`, text: cleanAmount });
     }
   }
 
-  const totalBonus = v['Tổng thưởng'] || '';
-  const bank = v['Ngân hàng'] || '';
-  const stk = v['STK'] || '';
-  const policy = v['Chính sách'] || '';
-  const status = v['Tình trạng'] || '';
+  const totalBonus = v["Tổng thưởng"] || "";
+  const bank = v["Ngân hàng"] || "";
+  const stk = v["STK"] || "";
+  const policy = v["Chính sách"] || "";
+  const status = v["Tình trạng"] || "";
 
   if (activeRewards.length > 0 || totalBonus || bank || stk || policy) {
     return (
@@ -224,12 +257,15 @@ function renderBonusOrProfile(v: Record<string, any>) {
         )}
         {(bank || stk) && (
           <div className="text-[11px] text-slate-600 font-mono flex items-center gap-1">
-            <span className="text-slate-400">{bank || 'TK'}:</span>
-            <span className="font-semibold text-slate-800">{stk || '—'}</span>
+            <span className="text-slate-400">{bank || "TK"}:</span>
+            <span className="font-semibold text-slate-800">{stk || "—"}</span>
           </div>
         )}
         {policy && (
-          <div className="text-[11px] text-slate-500 truncate max-w-[190px]" title={policy}>
+          <div
+            className="text-[11px] text-slate-500 truncate max-w-[190px]"
+            title={policy}
+          >
             CS: {policy}
           </div>
         )}
@@ -243,52 +279,61 @@ function renderBonusOrProfile(v: Record<string, any>) {
         <Tag color="blue" className="font-medium m-0">
           {status}
         </Tag>
-        {v['Loại HĐ'] && <div className="text-[11px] text-slate-500">{v['Loại HĐ']}</div>}
+        {v["Loại HĐ"] && (
+          <div className="text-[11px] text-slate-500">{v["Loại HĐ"]}</div>
+        )}
       </div>
     );
   }
 
-  return <span className="text-xs text-slate-400 italic">Không có dữ liệu</span>;
+  return (
+    <span className="text-xs text-slate-400 italic">Không có dữ liệu</span>
+  );
 }
 
 export default function ImportReviewPage() {
-  const [data, setData] = useState<{ warnings: ReviewItem[]; duplicates: ReviewItem[] }>({
+  const [data, setData] = useState<{
+    warnings: ReviewItem[];
+    duplicates: ReviewItem[];
+  }>({
     warnings: [],
     duplicates: [],
   });
   const [busy, setBusy] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [fileFilter, setFileFilter] = useState<string>();
   const [categoryFilter, setCategoryFilter] = useState<string>();
-  const [tab, setTab] = useState<'warnings' | 'duplicates'>('warnings');
+  const [tab, setTab] = useState<"warnings" | "duplicates">("warnings");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
   async function load() {
     setBusy(true);
     try {
-      const res = await fetch('/api/import-review', { cache: 'no-store' });
+      const res = await fetch("/api/import-review", { cache: "no-store" });
       const j = await res.json();
       if (j.success) {
         setData(j.data);
       } else {
-        message.error(j.message || 'Không thể tải danh sách');
+        message.error(j.message || "Không thể tải danh sách");
       }
     } catch {
-      message.error('Lỗi kết nối khi tải danh sách phân luồng');
+      message.error("Lỗi kết nối khi tải danh sách phân luồng");
     } finally {
       setBusy(false);
     }
   }
 
   useEffect(() => {
-    const type = new URLSearchParams(window.location.search).get('type');
-    setTab(type === 'duplicates' ? 'duplicates' : 'warnings');
+    const type = new URLSearchParams(window.location.search).get("type");
+    setTab(type === "duplicates" ? "duplicates" : "warnings");
     load();
   }, []);
 
   const files = useMemo(() => {
-    return [...new Set([...data.warnings, ...data.duplicates].map((r) => r.file))].sort();
+    return [
+      ...new Set([...data.warnings, ...data.duplicates].map((r) => r.file)),
+    ].sort();
   }, [data]);
 
   const categories = useMemo(() => {
@@ -314,15 +359,18 @@ export default function ImportReviewPage() {
 
     for (const item of warnList) {
       for (const issue of item.issues || []) {
-        if (issue.message.includes('Không xác định duy nhất đợt')) mismatchCount++;
-        else if (issue.message.includes('Thiếu số CCCD')) missingIdCount++;
-        else if (issue.message.includes('giữ nguyên mã tình trạng nguồn')) shorthandStatusCount++;
+        if (issue.message.includes("Không xác định duy nhất đợt"))
+          mismatchCount++;
+        else if (issue.message.includes("Thiếu số CCCD")) missingIdCount++;
+        else if (issue.message.includes("giữ nguyên mã tình trạng nguồn"))
+          shorthandStatusCount++;
       }
     }
 
     for (const item of dupList) {
       for (const issue of item.issues || []) {
-        if (issue.message.includes('Bản thưởng của đợt đã có')) duplicateBonusCount++;
+        if (issue.message.includes("Bản thưởng của đợt đã có"))
+          duplicateBonusCount++;
       }
     }
 
@@ -338,7 +386,7 @@ export default function ImportReviewPage() {
 
   const filteredData = useMemo(() => {
     const list = data[tab] || [];
-    const s = search.trim().toLocaleLowerCase('vi');
+    const s = search.trim().toLocaleLowerCase("vi");
 
     return list.filter((r) => {
       if (fileFilter && r.file !== fileFilter) return false;
@@ -353,11 +401,22 @@ export default function ImportReviewPage() {
 
       if (s) {
         const v = r.values || {};
-        const fullName = String(v['Họ tên'] || v['Họ và tên'] || '').toLocaleLowerCase('vi');
-        const idCard = String(v['Số CCCD'] || v['số CCCD'] || v['CCCD'] || '').toLocaleLowerCase('vi');
-        const phone = String(v['SĐT'] || v['Số điện thoại'] || '').toLocaleLowerCase('vi');
-        const company = String(v['Công ty'] || v['Nhà máy PV'] || v['Nhà máy làm việc'] || '').toLocaleLowerCase('vi');
-        const issuesText = r.issues.map((i) => i.message).join(' ').toLocaleLowerCase('vi');
+        const fullName = String(
+          v["Họ tên"] || v["Họ và tên"] || "",
+        ).toLocaleLowerCase("vi");
+        const idCard = String(
+          v["Số CCCD"] || v["số CCCD"] || v["CCCD"] || "",
+        ).toLocaleLowerCase("vi");
+        const phone = String(
+          v["SĐT"] || v["Số điện thoại"] || "",
+        ).toLocaleLowerCase("vi");
+        const company = String(
+          v["Công ty"] || v["Nhà máy PV"] || v["Nhà máy làm việc"] || "",
+        ).toLocaleLowerCase("vi");
+        const issuesText = r.issues
+          .map((i) => i.message)
+          .join(" ")
+          .toLocaleLowerCase("vi");
 
         return (
           fullName.includes(s) ||
@@ -374,11 +433,11 @@ export default function ImportReviewPage() {
 
   const columns: ColumnsType<ReviewItem> = [
     {
-      title: 'STT',
-      key: 'stt',
+      title: "STT",
+      key: "stt",
       width: 55,
-      align: 'center',
-      fixed: 'left',
+      align: "center",
+      fixed: "left",
       render: (_, __, index) => (
         <span className="font-semibold text-slate-500 text-xs">
           {(currentPage - 1) * pageSize + index + 1}
@@ -386,19 +445,22 @@ export default function ImportReviewPage() {
       ),
     },
     {
-      title: 'Người lao động',
-      key: 'worker',
+      title: "Người lao động",
+      key: "worker",
       width: 190,
-      fixed: 'left',
+      fixed: "left",
       render: (_, r) => {
         const v = r.values || {};
-        const fullName = v['Họ tên'] || v['Họ và tên'] || '—';
-        const idCard = v['Số CCCD'] || v['số CCCD'] || v['CCCD'] || '';
-        const phone = v['SĐT'] || v['Số điện thoại'] || '';
+        const fullName = v["Họ tên"] || v["Họ và tên"] || "—";
+        const idCard = v["Số CCCD"] || v["số CCCD"] || v["CCCD"] || "";
+        const phone = v["SĐT"] || v["Số điện thoại"] || "";
 
         return (
           <div className="space-y-0.5">
-            <div className="font-bold text-slate-900 text-xs truncate max-w-[170px]" title={fullName}>
+            <div
+              className="font-bold text-slate-900 text-xs truncate max-w-[170px]"
+              title={fullName}
+            >
               {fullName}
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -407,63 +469,75 @@ export default function ImportReviewPage() {
                   {idCard}
                 </span>
               ) : (
-                <span className="text-[11px] text-red-500 italic font-medium">[Thiếu CCCD]</span>
+                <span className="text-[11px] text-red-500 italic font-medium">
+                  [Thiếu CCCD]
+                </span>
               )}
-              {phone && <span className="text-[10px] text-slate-400">{phone}</span>}
+              {phone && (
+                <span className="text-[10px] text-slate-400">{phone}</span>
+              )}
             </div>
           </div>
         );
       },
     },
     {
-      title: 'Nhà máy & Đợt',
-      key: 'factory',
+      title: "Nhà máy & Đợt",
+      key: "factory",
       width: 160,
       render: (_, r) => {
         const v = r.values || {};
-        const factory = v['Công ty'] || v['Nhà máy PV'] || v['Nhà máy làm việc'] || '—';
-        const interviewDate = v['Ngày PV'] || v['Ngày phỏng vấn'] || '';
-        const month = v['Tháng'] || v['Tháng nhận việc'] || '';
+        const factory =
+          v["Công ty"] || v["Nhà máy PV"] || v["Nhà máy làm việc"] || "—";
+        const interviewDate = v["Ngày PV"] || v["Ngày phỏng vấn"] || "";
+        const month = v["Tháng"] || v["Tháng nhận việc"] || "";
 
         return (
           <div className="text-xs space-y-0.5">
-            <div className="font-semibold text-slate-800 truncate max-w-[145px]" title={factory}>
+            <div
+              className="font-semibold text-slate-800 truncate max-w-[145px]"
+              title={factory}
+            >
               {factory}
             </div>
             <div className="text-[11px] text-slate-500">
-              {interviewDate ? `PV: ${interviewDate}` : ''}
-              {interviewDate && month ? ' • ' : ''}
-              {month ? `${month}` : ''}
+              {interviewDate ? `PV: ${interviewDate}` : ""}
+              {interviewDate && month ? " • " : ""}
+              {month ? `${month}` : ""}
             </div>
           </div>
         );
       },
     },
     {
-      title: 'File nguồn & Dòng',
-      key: 'source',
+      title: "File nguồn & Dòng",
+      key: "source",
       width: 175,
       render: (_, r) => (
         <div className="text-xs space-y-0.5">
-          <Tag color="cyan" className="font-semibold text-[11px] max-w-[155px] truncate m-0 block" title={r.file}>
+          <Tag
+            color="cyan"
+            className="font-semibold text-[11px] max-w-[155px] truncate m-0 block"
+            title={r.file}
+          >
             {r.file}
           </Tag>
           <div className="text-[11px] text-slate-500">
             Dòng <strong className="text-slate-700">{r.row}</strong>
-            {r.sheet ? ` (${r.sheet})` : ''}
+            {r.sheet ? ` (${r.sheet})` : ""}
           </div>
         </div>
       ),
     },
     {
-      title: 'Khoản thưởng / Hồ sơ',
-      key: 'bonusContent',
+      title: "Khoản thưởng / Hồ sơ",
+      key: "bonusContent",
       width: 210,
       render: (_, r) => renderBonusOrProfile(r.values || {}),
     },
     {
-      title: 'Nguyên nhân chi tiết & Hướng xử lý',
-      key: 'issues',
+      title: "Nguyên nhân chi tiết & Hướng xử lý",
+      key: "issues",
       width: 455,
       render: (_, r) => {
         return (
@@ -476,7 +550,10 @@ export default function ImportReviewPage() {
                   className="rounded-md border border-slate-200 bg-slate-50/80 p-2 text-xs space-y-1"
                 >
                   <div className="flex items-start gap-1.5 flex-wrap">
-                    <Tag color={exp.color} className="font-semibold text-[11px] m-0 shrink-0">
+                    <Tag
+                      color={exp.color}
+                      className="font-semibold text-[11px] m-0 shrink-0"
+                    >
                       {exp.badge}
                     </Tag>
                     <span className="font-bold text-slate-800 text-xs leading-snug">
@@ -509,11 +586,16 @@ export default function ImportReviewPage() {
             <span>Phân luồng & Kiểm tra dữ liệu Import</span>
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Minh bạch hóa các dòng dữ liệu bị lệch hồ sơ hoặc có nguy cơ trùng lặp tiền thưởng khi nạp Excel.
+            Minh bạch hóa các dòng dữ liệu bị lệch hồ sơ hoặc có nguy cơ trùng
+            lặp tiền thưởng khi nạp Excel.
           </p>
         </div>
         <Button
-          icon={<RefreshCw className={`w-3.5 h-3.5 ${busy ? 'animate-spin' : ''}`} />}
+          icon={
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${busy ? "animate-spin" : ""}`}
+            />
+          }
           onClick={load}
           loading={busy}
           size="middle"
@@ -525,7 +607,10 @@ export default function ImportReviewPage() {
 
       {/* Thẻ thống kê nhanh (KPI Overview Cards) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card size="small" className="shadow-xs border-amber-200 bg-amber-50/40">
+        <Card
+          size="small"
+          className="shadow-xs border-amber-200 bg-amber-50/40"
+        >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-700">
               Cảnh báo dữ liệu
@@ -533,8 +618,10 @@ export default function ImportReviewPage() {
             <AlertCircle className="w-4 h-4 text-amber-600" />
           </div>
           <div className="mt-1 text-xl font-bold text-slate-900">
-            {stats.warningsTotal.toLocaleString('vi-VN')}
-            <span className="text-xs font-normal text-slate-500 ml-1">dòng</span>
+            {stats.warningsTotal.toLocaleString("vi-VN")}
+            <span className="text-xs font-normal text-slate-500 ml-1">
+              dòng
+            </span>
           </div>
           <p className="mt-0.5 text-[11px] text-slate-600 truncate">
             Giữ an toàn trong hệ thống để đối chiếu
@@ -549,8 +636,10 @@ export default function ImportReviewPage() {
             <AlertTriangle className="w-4 h-4 text-red-600" />
           </div>
           <div className="mt-1 text-xl font-bold text-slate-900">
-            {stats.duplicatesTotal.toLocaleString('vi-VN')}
-            <span className="text-xs font-normal text-slate-500 ml-1">dòng</span>
+            {stats.duplicatesTotal.toLocaleString("vi-VN")}
+            <span className="text-xs font-normal text-slate-500 ml-1">
+              dòng
+            </span>
           </div>
           <p className="mt-0.5 text-[11px] text-slate-600 truncate">
             Chặn ghi đè tránh chi trả 2 lần
@@ -565,15 +654,20 @@ export default function ImportReviewPage() {
             <Users className="w-4 h-4 text-blue-600" />
           </div>
           <div className="mt-1 text-xl font-bold text-slate-900">
-            {stats.mismatchCount.toLocaleString('vi-VN')}
-            <span className="text-xs font-normal text-slate-500 ml-1">dòng</span>
+            {stats.mismatchCount.toLocaleString("vi-VN")}
+            <span className="text-xs font-normal text-slate-500 ml-1">
+              dòng
+            </span>
           </div>
           <p className="mt-0.5 text-[11px] text-slate-600 truncate">
             Lệch Nhà máy hoặc Ngày PV với DS_TONG
           </p>
         </Card>
 
-        <Card size="small" className="shadow-xs border-purple-200 bg-purple-50/40">
+        <Card
+          size="small"
+          className="shadow-xs border-purple-200 bg-purple-50/40"
+        >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-purple-700">
               Thiếu số CCCD
@@ -581,8 +675,10 @@ export default function ImportReviewPage() {
             <Coins className="w-4 h-4 text-purple-600" />
           </div>
           <div className="mt-1 text-xl font-bold text-slate-900">
-            {stats.missingIdCount.toLocaleString('vi-VN')}
-            <span className="text-xs font-normal text-slate-500 ml-1">dòng</span>
+            {stats.missingIdCount.toLocaleString("vi-VN")}
+            <span className="text-xs font-normal text-slate-500 ml-1">
+              dòng
+            </span>
           </div>
           <p className="mt-0.5 text-[11px] text-slate-600 truncate">
             Thưởng - Phần 2 bị lệch hàng tiêu đề
@@ -591,7 +687,7 @@ export default function ImportReviewPage() {
       </div>
 
       {/* Alert hướng dẫn ngắn gọn */}
-      {tab === 'warnings' ? (
+      {tab === "warnings" ? (
         <Alert
           type="warning"
           showIcon
@@ -653,7 +749,7 @@ export default function ImportReviewPage() {
             <Button
               size="middle"
               onClick={() => {
-                setSearch('');
+                setSearch("");
                 setFileFilter(undefined);
                 setCategoryFilter(undefined);
                 setCurrentPage(1);
@@ -665,7 +761,9 @@ export default function ImportReviewPage() {
           )}
 
           <div className="ml-auto text-xs text-slate-500 font-medium">
-            Hiển thị <strong>{filteredData.length.toLocaleString('vi-VN')}</strong> / {data[tab].length.toLocaleString('vi-VN')} dòng
+            Hiển thị{" "}
+            <strong>{filteredData.length.toLocaleString("vi-VN")}</strong> /{" "}
+            {data[tab].length.toLocaleString("vi-VN")} dòng
           </div>
         </div>
       </Card>
@@ -681,7 +779,7 @@ export default function ImportReviewPage() {
         type="card"
         items={[
           {
-            key: 'warnings',
+            key: "warnings",
             label: (
               <span className="flex items-center gap-2 px-1">
                 <AlertCircle className="w-4 h-4 text-amber-600" />
@@ -690,7 +788,7 @@ export default function ImportReviewPage() {
                   count={data.warnings.length}
                   overflowCount={99999}
                   className="ml-1"
-                  style={{ backgroundColor: '#f59e0b' }}
+                  style={{ backgroundColor: "#f59e0b" }}
                 />
               </span>
             ),
@@ -711,37 +809,53 @@ export default function ImportReviewPage() {
                     setPageSize(size);
                   },
                   showSizeChanger: true,
-                  pageSizeOptions: ['10', '20', '50', '100'],
-                  showTotal: (total, range) => `${range[0]}-${range[1]} trên tổng số ${total} dòng`,
+                  pageSizeOptions: ["10", "20", "50", "100"],
+                  showTotal: (total, range) =>
+                    `${range[0]}-${range[1]} trên tổng số ${total} dòng`,
                 }}
                 expandable={{
                   expandedRowRender: (r) => (
                     <div className="p-3 bg-slate-50/95 rounded-lg border border-slate-200 space-y-2">
                       <div className="font-semibold text-xs text-slate-700 flex items-center gap-1.5">
                         <FileSpreadsheet className="w-4 h-4 text-blue-600" />
-                        <span>Toàn bộ các cột nguyên gốc trong Excel (Dòng {r.row} - Sheet: {r.sheet || 'Mặc định'}):</span>
+                        <span>
+                          Toàn bộ các cột nguyên gốc trong Excel (Dòng {r.row} -
+                          Sheet: {r.sheet || "Mặc định"}):
+                        </span>
                       </div>
                       <Table<any>
                         rowKey="column"
                         size="small"
                         pagination={false}
-                        dataSource={Object.entries(r.values || {}).map(([column, value]) => ({
-                          column,
-                          value: String(value ?? ''),
-                        }))}
+                        dataSource={Object.entries(r.values || {}).map(
+                          ([column, value]) => ({
+                            column,
+                            value: String(value ?? ""),
+                          }),
+                        )}
                         columns={[
                           {
-                            title: 'Tên cột trong Excel',
-                            dataIndex: 'column',
+                            title: "Tên cột trong Excel",
+                            dataIndex: "column",
                             width: 240,
-                            render: (v) => <strong className="text-slate-800 text-xs">{v}</strong>,
+                            render: (v) => (
+                              <strong className="text-slate-800 text-xs">
+                                {v}
+                              </strong>
+                            ),
                           },
                           {
-                            title: 'Giá trị ghi nhận từ file',
-                            dataIndex: 'value',
+                            title: "Giá trị ghi nhận từ file",
+                            dataIndex: "value",
                             render: (v) => (
-                              <span className={v ? 'text-slate-900 font-medium text-xs' : 'text-slate-400 italic text-xs'}>
-                                {v || '(Trống)'}
+                              <span
+                                className={
+                                  v
+                                    ? "text-slate-900 font-medium text-xs"
+                                    : "text-slate-400 italic text-xs"
+                                }
+                              >
+                                {v || "(Trống)"}
                               </span>
                             ),
                           },
@@ -754,7 +868,7 @@ export default function ImportReviewPage() {
             ),
           },
           {
-            key: 'duplicates',
+            key: "duplicates",
             label: (
               <span className="flex items-center gap-2 px-1">
                 <AlertTriangle className="w-4 h-4 text-red-600" />
@@ -763,7 +877,7 @@ export default function ImportReviewPage() {
                   count={data.duplicates.length}
                   overflowCount={99999}
                   className="ml-1"
-                  style={{ backgroundColor: '#ef4444' }}
+                  style={{ backgroundColor: "#ef4444" }}
                 />
               </span>
             ),
@@ -784,37 +898,53 @@ export default function ImportReviewPage() {
                     setPageSize(size);
                   },
                   showSizeChanger: true,
-                  pageSizeOptions: ['10', '20', '50', '100'],
-                  showTotal: (total, range) => `${range[0]}-${range[1]} trên tổng số ${total} dòng`,
+                  pageSizeOptions: ["10", "20", "50", "100"],
+                  showTotal: (total, range) =>
+                    `${range[0]}-${range[1]} trên tổng số ${total} dòng`,
                 }}
                 expandable={{
                   expandedRowRender: (r) => (
                     <div className="p-3 bg-slate-50/95 rounded-lg border border-slate-200 space-y-2">
                       <div className="font-semibold text-xs text-slate-700 flex items-center gap-1.5">
                         <FileSpreadsheet className="w-4 h-4 text-red-600" />
-                        <span>Đối chiếu bản ghi Excel trùng lặp (Dòng {r.row} - Sheet: {r.sheet || 'Mặc định'}):</span>
+                        <span>
+                          Đối chiếu bản ghi Excel trùng lặp (Dòng {r.row} -
+                          Sheet: {r.sheet || "Mặc định"}):
+                        </span>
                       </div>
                       <Table<any>
                         rowKey="column"
                         size="small"
                         pagination={false}
-                        dataSource={Object.entries(r.values || {}).map(([column, value]) => ({
-                          column,
-                          value: String(value ?? ''),
-                        }))}
+                        dataSource={Object.entries(r.values || {}).map(
+                          ([column, value]) => ({
+                            column,
+                            value: String(value ?? ""),
+                          }),
+                        )}
                         columns={[
                           {
-                            title: 'Tên cột trong Excel',
-                            dataIndex: 'column',
+                            title: "Tên cột trong Excel",
+                            dataIndex: "column",
                             width: 240,
-                            render: (v) => <strong className="text-slate-800 text-xs">{v}</strong>,
+                            render: (v) => (
+                              <strong className="text-slate-800 text-xs">
+                                {v}
+                              </strong>
+                            ),
                           },
                           {
-                            title: 'Giá trị ghi nhận từ file',
-                            dataIndex: 'value',
+                            title: "Giá trị ghi nhận từ file",
+                            dataIndex: "value",
                             render: (v) => (
-                              <span className={v ? 'text-slate-900 font-medium text-xs' : 'text-slate-400 italic text-xs'}>
-                                {v || '(Trống)'}
+                              <span
+                                className={
+                                  v
+                                    ? "text-slate-900 font-medium text-xs"
+                                    : "text-slate-400 italic text-xs"
+                                }
+                              >
+                                {v || "(Trống)"}
                               </span>
                             ),
                           },

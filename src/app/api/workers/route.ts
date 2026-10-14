@@ -1,80 +1,271 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { matchesAssignment } from '@/lib/reporting';
-import { assignmentRelations, resultError, today, warnsWorker } from '@/lib/domain';
-import { guard, identity } from '@/lib/auth';
-import { WORKER_FIELDS, ASSIGNMENT_FIELDS, cleanFields, validateWorker, phoneKey, ended, validateInterview } from '@/lib/worker-validation';
-export const dynamic = 'force-dynamic';
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { matchesAssignment } from "@/lib/reporting";
+import {
+  assignmentRelations,
+  resultError,
+  today,
+  warnsWorker,
+} from "@/lib/domain";
+import { guard, identity } from "@/lib/auth";
+import {
+  WORKER_FIELDS,
+  ASSIGNMENT_FIELDS,
+  cleanFields,
+  validateWorker,
+  phoneKey,
+  ended,
+  validateInterview,
+} from "@/lib/worker-validation";
+export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
-    const denied = await guard(request);
-    if (denied)
-        return denied;
-    try {
-        const params = request.nextUrl.searchParams, search = params.get('search')?.trim() || '';
-        const workers = await prisma.worker.findMany({ where: search ? { archivedAt:params.get('archived')==='true'?{not:null}:null, OR: ['fullName', 'idCard', 'phone', 'code', 'recruiter'].map(field => ({ [field]: { contains: search } })) } : {archivedAt:params.get('archived')==='true'?{not:null}:null}, include: { assignments: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] }, bankAccounts: { orderBy: { createdAt: 'desc' } } }, orderBy: { createdAt: 'desc' } });
-        return NextResponse.json({success:true,data:workers.filter(w=>w.assignments.some(a=>matchesAssignment({...a,worker:w},params)&&(!params.get('factory')||a.interviewFactory===params.get('factory'))&&(!params.get('status')||a.status===params.get('status'))))});
-    }
-    catch {
-        return NextResponse.json({ success: false, message: 'Không thể tải hồ sơ' }, { status: 500 });
-    }
+  const denied = await guard(request);
+  if (denied) return denied;
+  try {
+    const params = request.nextUrl.searchParams,
+      search = params.get("search")?.trim() || "";
+    const workers = await prisma.worker.findMany({
+      where: search
+        ? {
+            archivedAt:
+              params.get("archived") === "true" ? { not: null } : null,
+            OR: ["fullName", "idCard", "phone", "code", "recruiter"].map(
+              (field) => ({ [field]: { contains: search } }),
+            ),
+          }
+        : {
+            archivedAt:
+              params.get("archived") === "true" ? { not: null } : null,
+          },
+      include: {
+        assignments: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] },
+        bankAccounts: { orderBy: { createdAt: "desc" } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return NextResponse.json({
+      success: true,
+      data: workers.filter((w) =>
+        w.assignments.some(
+          (a) =>
+            matchesAssignment({ ...a, worker: w }, params) &&
+            (!params.get("factory") ||
+              a.interviewFactory === params.get("factory")) &&
+            (!params.get("status") || a.status === params.get("status")),
+        ),
+      ),
+    });
+  } catch {
+    return NextResponse.json(
+      { success: false, message: "Không thể tải hồ sơ" },
+      { status: 500 },
+    );
+  }
 }
 export async function POST(request: NextRequest) {
-    const denied = await guard(request, 'worker:write');
-    if (denied)
-        return denied;
-    let body: any, worker: Record<string, string>, assignment: Record<string, string>;
-    try {
-        body = await request.json();
-        if (!body || typeof body !== 'object')
-            throw new Error('Dữ liệu không hợp lệ');
-        worker = cleanFields(body, WORKER_FIELDS);
-        worker.idCard = typeof body.idCard === 'string' ? body.idCard.trim() : '';
-        assignment = cleanFields(body, ASSIGNMENT_FIELDS);
-        assignment.status ||= 'Đang chờ phỏng vấn';
-        validateWorker(worker, assignment);
-        validateInterview(assignment);
-        for(const f of ['orderId','batchId'])if(!assignment[f])delete assignment[f];
-        assignment.team ??= worker.team || '';
-        if (!['Đã nghỉ việc','Nghỉ hẳn','Hết hợp đồng','Bỏ xưởng','Bỏ vì sức khỏe','Hết phí'].includes(assignment.status)) {
-            assignment.leaveDate = '';
-            assignment.leaveReason = '';
-        }
+  const denied = await guard(request, "worker:write");
+  if (denied) return denied;
+  let body: any,
+    worker: Record<string, string>,
+    assignment: Record<string, string>;
+  try {
+    body = await request.json();
+    if (!body || typeof body !== "object")
+      throw new Error("Dữ liệu không hợp lệ");
+    worker = cleanFields(body, WORKER_FIELDS);
+    worker.idCard = typeof body.idCard === "string" ? body.idCard.trim() : "";
+    assignment = cleanFields(body, ASSIGNMENT_FIELDS);
+    assignment.status ||= "Đang chờ phỏng vấn";
+    validateWorker(worker, assignment);
+    validateInterview(assignment);
+    for (const f of ["orderId", "batchId"])
+      if (!assignment[f]) delete assignment[f];
+    assignment.team ??= worker.team || "";
+    if (
+      ![
+        "Đã nghỉ việc",
+        "Nghỉ hẳn",
+        "Hết hợp đồng",
+        "Bỏ xưởng",
+        "Bỏ vì sức khỏe",
+        "Hết phí",
+      ].includes(assignment.status)
+    ) {
+      assignment.leaveDate = "";
+      assignment.leaveReason = "";
     }
-    catch (error: any) {
-        return NextResponse.json({ success: false, message: error.message }, { status: 400 });
-    }
-    const actor = (await identity(request))!;
-    try {
-        const result = await prisma.$transaction(async (tx) => {
-            await assignmentRelations(tx,assignment);
-            const existing = await tx.worker.findUnique({ where: { idCard: worker.idCard }, include: { assignments: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] } } });
-            if (existing) {
-                if(existing.archivedAt)return {status:409,body:{success:false,message:'Hồ sơ đang lưu trữ. Khôi phục trước khi thêm đợt tuyển.'}};
-                if(existing.isBlacklisted)return {status:409,body:{success:false,message:'Hồ sơ đang hạn chế, cần quản trị viên xác minh'}};
-                if(existing.fullName.trim().toLocaleLowerCase('vi')!==worker.fullName.toLocaleLowerCase('vi'))return {status:409,body:{success:false,message:'Tên không khớp CCCD cũ; xác minh và sửa hồ sơ trước khi tiếp tục'}};
-                if(await warnsWorker(tx,existing)&&body.confirmActiveDuplicate!==true)return {status:409,body:{success:false,isDuplicate:true,duplicateType:'ACTIVE_LABOR',existingWorkerId:existing.id,message:'CCCD đang có đợt Đang làm việc/Chưa đào tạo. Xem lịch sử và xác nhận trước khi thêm đợt mới.'}};
-                if(ended(assignment.status))return {status:400,body:{success:false,message:'Đợt tuyển mới không được bắt đầu ở trạng thái kết thúc'}};
-                const a = await tx.workAssignment.create({ data: { ...assignment, workerId: existing.id, interviewFactory: assignment.interviewFactory } });
-                await tx.assignmentEvent.create({data:{assignmentId:a.id,occurredOn:today(),toStatus:a.status,interviewResult:a.interviewResult,operator:actor.username,note:'Tạo đợt mới; giữ lịch sử cũ'}});
-                await tx.auditLog.create({ data: { action: 'REHIRE', module: 'WORKER', operator: actor.username, details: `Tái tuyển hồ sơ ${existing.id}, đợt ${a.id}` } });
-                return { status: 201, body: { success: true, data: await tx.worker.findUnique({ where: { id: existing.id }, include: { assignments: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] } } }) } };
-            }
-            if (body.rehire === true)
-                return { status: 404, body: { success: false, message: 'Không tìm thấy CCCD để tái tuyển' } };
-            if (worker.phone) {
-                const others = await tx.worker.findMany({where:{phone:{not:null},archivedAt:null},include:{assignments:true}});
-                const activeOthers=[];for(const w of others)if(await warnsWorker(tx,w))activeOthers.push(w);
-                if (activeOthers.some(w => phoneKey(w.phone!) === worker.phone) && body.confirmPhoneDuplicate !== true)
-                    return { status: 409, body: { success: false, isDuplicate: true, duplicateType: 'PHONE', message: 'SĐT đã có trong hồ sơ khác. Chỉ tiếp tục sau khi xác minh và xác nhận dùng chung số.' } };
-            }
-            const data = await tx.worker.create({ data: { ...worker, fullName: worker.fullName, idCard: worker.idCard, assignments: { create: { ...assignment, interviewFactory: assignment.interviewFactory } } }, include: { assignments: true } });
-            await tx.assignmentEvent.create({data:{assignmentId:data.assignments[0].id,occurredOn:today(),toStatus:assignment.status,interviewResult:assignment.interviewResult||'UNKNOWN',operator:actor.username}});
-            await tx.auditLog.create({ data: { action: 'CREATE', module: 'WORKER', operator: actor.username, details: `Tạo hồ sơ ${data.id}${body.confirmPhoneDuplicate === true ? ' (đã xác nhận SĐT trùng)' : ''}` } });
-            return { status: 201, body: { success: true, data } };
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, message: error.message },
+      { status: 400 },
+    );
+  }
+  const actor = (await identity(request))!;
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      await assignmentRelations(tx, assignment);
+      const existing = await tx.worker.findUnique({
+        where: { idCard: worker.idCard },
+        include: {
+          assignments: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] },
+        },
+      });
+      if (existing) {
+        if (existing.archivedAt)
+          return {
+            status: 409,
+            body: {
+              success: false,
+              message:
+                "Hồ sơ đang lưu trữ. Khôi phục trước khi thêm đợt tuyển.",
+            },
+          };
+        if (existing.isBlacklisted)
+          return {
+            status: 409,
+            body: {
+              success: false,
+              message: "Hồ sơ đang hạn chế, cần quản trị viên xác minh",
+            },
+          };
+        if (
+          existing.fullName.trim().toLocaleLowerCase("vi") !==
+          worker.fullName.toLocaleLowerCase("vi")
+        )
+          return {
+            status: 409,
+            body: {
+              success: false,
+              message:
+                "Tên không khớp CCCD cũ; xác minh và sửa hồ sơ trước khi tiếp tục",
+            },
+          };
+        if (
+          (await warnsWorker(tx, existing)) &&
+          body.confirmActiveDuplicate !== true
+        )
+          return {
+            status: 409,
+            body: {
+              success: false,
+              isDuplicate: true,
+              duplicateType: "ACTIVE_LABOR",
+              existingWorkerId: existing.id,
+              message:
+                "CCCD đang có đợt Đang làm việc/Chưa đào tạo. Xem lịch sử và xác nhận trước khi thêm đợt mới.",
+            },
+          };
+        if (ended(assignment.status))
+          return {
+            status: 400,
+            body: {
+              success: false,
+              message: "Đợt tuyển mới không được bắt đầu ở trạng thái kết thúc",
+            },
+          };
+        const a = await tx.workAssignment.create({
+          data: {
+            ...assignment,
+            workerId: existing.id,
+            interviewFactory: assignment.interviewFactory,
+          },
         });
-        return NextResponse.json(result.body, { status: result.status });
-    }
-    catch (error: any) {
-        return resultError(error);
-    }
+        await tx.assignmentEvent.create({
+          data: {
+            assignmentId: a.id,
+            occurredOn: today(),
+            toStatus: a.status,
+            interviewResult: a.interviewResult,
+            operator: actor.username,
+            note: "Tạo đợt mới; giữ lịch sử cũ",
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            action: "REHIRE",
+            module: "WORKER",
+            operator: actor.username,
+            details: `Tái tuyển hồ sơ ${existing.id}, đợt ${a.id}`,
+          },
+        });
+        return {
+          status: 201,
+          body: {
+            success: true,
+            data: await tx.worker.findUnique({
+              where: { id: existing.id },
+              include: {
+                assignments: {
+                  orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                },
+              },
+            }),
+          },
+        };
+      }
+      if (body.rehire === true)
+        return {
+          status: 404,
+          body: { success: false, message: "Không tìm thấy CCCD để tái tuyển" },
+        };
+      if (worker.phone) {
+        const others = await tx.worker.findMany({
+          where: { phone: { not: null }, archivedAt: null },
+          include: { assignments: true },
+        });
+        const activeOthers = [];
+        for (const w of others)
+          if (await warnsWorker(tx, w)) activeOthers.push(w);
+        if (
+          activeOthers.some((w) => phoneKey(w.phone!) === worker.phone) &&
+          body.confirmPhoneDuplicate !== true
+        )
+          return {
+            status: 409,
+            body: {
+              success: false,
+              isDuplicate: true,
+              duplicateType: "PHONE",
+              message:
+                "SĐT đã có trong hồ sơ khác. Chỉ tiếp tục sau khi xác minh và xác nhận dùng chung số.",
+            },
+          };
+      }
+      const data = await tx.worker.create({
+        data: {
+          ...worker,
+          fullName: worker.fullName,
+          idCard: worker.idCard,
+          assignments: {
+            create: {
+              ...assignment,
+              interviewFactory: assignment.interviewFactory,
+            },
+          },
+        },
+        include: { assignments: true },
+      });
+      await tx.assignmentEvent.create({
+        data: {
+          assignmentId: data.assignments[0].id,
+          occurredOn: today(),
+          toStatus: assignment.status,
+          interviewResult: assignment.interviewResult || "UNKNOWN",
+          operator: actor.username,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          action: "CREATE",
+          module: "WORKER",
+          operator: actor.username,
+          details: `Tạo hồ sơ ${data.id}${body.confirmPhoneDuplicate === true ? " (đã xác nhận SĐT trùng)" : ""}`,
+        },
+      });
+      return { status: 201, body: { success: true, data } };
+    });
+    return NextResponse.json(result.body, { status: result.status });
+  } catch (error: any) {
+    return resultError(error);
+  }
 }

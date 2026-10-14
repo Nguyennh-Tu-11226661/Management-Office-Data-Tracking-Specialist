@@ -1,8 +1,8 @@
-'use client';
-import React, { useState, useEffect } from 'react';
-import { useIdentity } from '@/components/AuthGate';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+"use client";
+import React, { useState, useEffect } from "react";
+import { useIdentity } from "@/components/AuthGate";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   FileText,
   LayoutDashboard,
@@ -28,7 +28,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
-} from 'lucide-react';
+} from "lucide-react";
 
 interface NavItem {
   href: string;
@@ -44,54 +44,116 @@ interface NavGroup {
 
 const navGroups: NavGroup[] = [
   {
-    group: 'BÁO CÁO & KPI',
+    group: "BÁO CÁO & KPI",
     items: [
-      { href: '/workers', label: 'Hồ sơ lao động (DS_TONG)', icon: FileText },
-      { href: '/', label: 'Tổng quan Dashboard', icon: LayoutDashboard },
-      { href: '/orders', label: 'Đơn hàng & đợt tuyển', icon: Target },
-      { href: '/duplicates', label: 'Cảnh báo trùng lặp', icon: ShieldAlert },
-      { href: '/lookup', label: 'Tra cứu người LĐ', icon: Fingerprint },
+      { href: "/workers", label: "Hồ sơ lao động (DS_TONG)", icon: FileText },
+      { href: "/", label: "Tổng quan Dashboard", icon: LayoutDashboard },
+      { href: "/orders", label: "Đơn hàng & đợt tuyển", icon: Target },
+      { href: "/duplicates", label: "Cảnh báo trùng lặp", icon: ShieldAlert },
+      { href: "/lookup", label: "Tra cứu người LĐ", icon: Fingerprint },
     ],
   },
   {
-    group: 'CHÍNH SÁCH & THƯỞNG',
+    group: "CHÍNH SÁCH & THƯỞNG",
     items: [
-      { href: '/bonuses', label: 'Quản lý Thưởng (DS_THUONG)', icon: Coins },
-      { href: '/rewards', label: 'Mốc thưởng / Đã trả', icon: Award },
-      { href: '/bank-accounts', label: 'Tài chính & STK 2026', icon: CreditCard },
-      { href: '/policies', label: 'Chính sách thưởng', icon: SlidersHorizontal },
+      { href: "/bonuses", label: "Quản lý Thưởng (DS_THUONG)", icon: Coins },
+      { href: "/rewards", label: "Mốc thưởng / Đã trả", icon: Award },
+      {
+        href: "/bank-accounts",
+        label: "Tài chính & STK 2026",
+        icon: CreditCard,
+      },
+      {
+        href: "/policies",
+        label: "Chính sách thưởng",
+        icon: SlidersHorizontal,
+      },
     ],
   },
   {
-    group: 'HỆ THỐNG & CÔNG CỤ',
+    group: "HỆ THỐNG & CÔNG CỤ",
     items: [
-      { href: '/excel-tools', label: 'Bộ máy Excel Engine', icon: FileSpreadsheet },
-      { href: '/import-review', label: 'Cảnh báo / Trùng import', icon: ShieldAlert },
-      { href: '/catalogs', label: 'Danh mục cấu hình', icon: Layers },
-      { href: '/audit', label: 'Lịch sử thay đổi', icon: History },
-      { href: '/permissions', label: 'Phân quyền & Tài khoản', icon: Shield },
+      {
+        href: "/excel-tools",
+        label: "Bộ máy Excel Engine",
+        icon: FileSpreadsheet,
+      },
+      {
+        href: "/import-review",
+        label: "Cảnh báo / Trùng import",
+        icon: ShieldAlert,
+      },
+      { href: "/catalogs", label: "Danh mục cấu hình", icon: Layers },
+      { href: "/audit", label: "Lịch sử thay đổi", icon: History },
+      { href: "/permissions", label: "Phân quyền & Tài khoản", icon: Shield },
     ],
   },
 ];
 
 const TAB_TITLES: Record<string, { title: string; subtitle?: string }> = {
-  '/': { title: 'Tổng quan Dashboard', subtitle: 'Báo cáo tiến độ và công suất phễu tuyển dụng toàn công ty' },
-  '/workers': { title: 'Hồ sơ lao động (DS_TONG)', subtitle: 'Kiểm tra hồ sơ và xuất dữ liệu đang lọc' },
-  '/orders': { title: 'Đơn hàng & đợt tuyển', subtitle: 'Theo dõi tiến độ đơn hàng và chỉ tiêu theo từng nhà máy' },
-  '/duplicates': { title: 'Cảnh báo trùng lặp', subtitle: 'Phát hiện ứng viên trùng CCCD, SĐT hoặc nghỉ việc quay lại' },
-  '/lookup': { title: 'Tra cứu người LĐ', subtitle: 'Giải mã tự động và tra cứu hồ sơ cá nhân theo CCCD 12 số' },
-  '/bonuses': { title: 'Quản lý Thưởng (DS_THUONG)', subtitle: 'Ghi nhận và xét duyệt 7 khoản thưởng theo chính sách' },
-  '/rewards': { title: 'Mốc thưởng & Đã trả', subtitle: 'Tiến độ mốc công yêu cầu và ghi nhận chứng từ thanh toán' },
-  '/bank-accounts': { title: 'Tài chính & STK 2026', subtitle: 'Đối chiếu số tài khoản ngân hàng và kiểm soát rủi ro lệch tên' },
-  '/policies': { title: 'Chính sách thưởng', subtitle: 'Quy chế thưởng công nhân theo nhà máy và đơn hàng' },
-  '/import-review': {title:'Phân luồng import',subtitle:'Cảnh báo dữ liệu và danh sách trùng chờ kiểm tra'},
-  '/excel-tools': { title: 'Bộ máy Excel Engine', subtitle: 'Nhập xuất dữ liệu DS_TONG, lệnh chi ngân hàng và cảnh báo trùng' },
-  '/catalogs': { title: 'Danh mục cấu hình', subtitle: 'Thiết lập danh mục nhà máy, team và trạng thái lao động' },
-  '/audit': { title: 'Lịch sử thay đổi', subtitle: 'Nhật ký kiểm toán toàn bộ thao tác thêm, sửa, xóa, duyệt' },
-  '/permissions': { title: 'Phân quyền & Tài khoản', subtitle: 'Quản lý vai trò người dùng và bảo mật hệ thống' },
+  "/": {
+    title: "Tổng quan Dashboard",
+    subtitle: "Báo cáo tiến độ và công suất phễu tuyển dụng toàn công ty",
+  },
+  "/workers": {
+    title: "Hồ sơ lao động (DS_TONG)",
+    subtitle: "Kiểm tra hồ sơ và xuất dữ liệu đang lọc",
+  },
+  "/orders": {
+    title: "Đơn hàng & đợt tuyển",
+    subtitle: "Theo dõi tiến độ đơn hàng và chỉ tiêu theo từng nhà máy",
+  },
+  "/duplicates": {
+    title: "Cảnh báo trùng lặp",
+    subtitle: "Phát hiện ứng viên trùng CCCD, SĐT hoặc nghỉ việc quay lại",
+  },
+  "/lookup": {
+    title: "Tra cứu người LĐ",
+    subtitle: "Giải mã tự động và tra cứu hồ sơ cá nhân theo CCCD 12 số",
+  },
+  "/bonuses": {
+    title: "Quản lý Thưởng (DS_THUONG)",
+    subtitle: "Ghi nhận và xét duyệt 7 khoản thưởng theo chính sách",
+  },
+  "/rewards": {
+    title: "Mốc thưởng & Đã trả",
+    subtitle: "Tiến độ mốc công yêu cầu và ghi nhận chứng từ thanh toán",
+  },
+  "/bank-accounts": {
+    title: "Tài chính & STK 2026",
+    subtitle: "Đối chiếu số tài khoản ngân hàng và kiểm soát rủi ro lệch tên",
+  },
+  "/policies": {
+    title: "Chính sách thưởng",
+    subtitle: "Quy chế thưởng công nhân theo nhà máy và đơn hàng",
+  },
+  "/import-review": {
+    title: "Phân luồng import",
+    subtitle: "Cảnh báo dữ liệu và danh sách trùng chờ kiểm tra",
+  },
+  "/excel-tools": {
+    title: "Bộ máy Excel Engine",
+    subtitle: "Nhập xuất dữ liệu DS_TONG, lệnh chi ngân hàng và cảnh báo trùng",
+  },
+  "/catalogs": {
+    title: "Danh mục cấu hình",
+    subtitle: "Thiết lập danh mục nhà máy, team và trạng thái lao động",
+  },
+  "/audit": {
+    title: "Lịch sử thay đổi",
+    subtitle: "Nhật ký kiểm toán toàn bộ thao tác thêm, sửa, xóa, duyệt",
+  },
+  "/permissions": {
+    title: "Phân quyền & Tài khoản",
+    subtitle: "Quản lý vai trò người dùng và bảo mật hệ thống",
+  },
 };
 
-export default function Navigation({ children }: { children?: React.ReactNode }) {
+export default function Navigation({
+  children,
+}: {
+  children?: React.ReactNode;
+}) {
   const pathname = usePathname();
   const user = useIdentity();
   const [isOpenMobile, setIsOpenMobile] = useState(false);
@@ -102,16 +164,16 @@ export default function Navigation({ children }: { children?: React.ReactNode })
   }, [pathname]);
 
   const meta = TAB_TITLES[pathname] || {
-    title: 'Trang điều hành • Tuyển dụng & Thưởng',
-    subtitle: 'Hệ thống Quản trị Lao động Tri Thức Việt 2026',
+    title: "Trang điều hành • Tuyển dụng & Thưởng",
+    subtitle: "Hệ thống Quản trị Lao động Tri Thức Việt 2026",
   };
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      window.location.assign('/');
+      await fetch("/api/auth/logout", { method: "POST" });
+      window.location.assign("/");
     } catch {
-      window.location.assign('/');
+      window.location.assign("/");
     }
   };
 
@@ -128,7 +190,7 @@ export default function Navigation({ children }: { children?: React.ReactNode })
       {/* SIDEBAR BÊN TRÁI - PHONG CÁCH TRI THỨC VIỆT */}
       <aside
         className={`fixed top-0 bottom-0 left-0 z-50 flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white transition-transform duration-200 ease-in-out md:static md:translate-x-0 ${
-          isOpenMobile ? 'translate-x-0' : '-translate-x-full'
+          isOpenMobile ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Brand Header */}
@@ -139,8 +201,12 @@ export default function Navigation({ children }: { children?: React.ReactNode })
               <span className="text-xs tracking-wider">TTV</span>
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-bold text-slate-900 truncate">Tri Thức Việt</div>
-              <div className="text-[11px] text-slate-500 truncate">Trang điều hành • Quản lí</div>
+              <div className="text-sm font-bold text-slate-900 truncate">
+                Tri Thức Việt
+              </div>
+              <div className="text-[11px] text-slate-500 truncate">
+                Trang điều hành • Quản lí
+              </div>
             </div>
           </div>
           <button
@@ -156,7 +222,7 @@ export default function Navigation({ children }: { children?: React.ReactNode })
           {navGroups.map((group) => {
             const visibleItems = user
               ? group.items
-              : group.items.filter((i) => i.href === '/lookup');
+              : group.items.filter((i) => i.href === "/lookup");
 
             if (visibleItems.length === 0) return null;
 
@@ -175,13 +241,13 @@ export default function Navigation({ children }: { children?: React.ReactNode })
                         href={item.href}
                         className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-medium transition-colors ${
                           isActive
-                            ? 'bg-blue-50 font-semibold text-blue-600'
-                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                            ? "bg-blue-50 font-semibold text-blue-600"
+                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                         }`}
                       >
                         <Icon
                           className={`h-4 w-4 shrink-0 ${
-                            isActive ? 'text-blue-600' : 'text-slate-400'
+                            isActive ? "text-blue-600" : "text-slate-400"
                           }`}
                         />
                         <span className="truncate">{item.label}</span>
@@ -230,8 +296,12 @@ export default function Navigation({ children }: { children?: React.ReactNode })
         {/* Footer info chuẩn TTV */}
         <div className="border-t border-slate-100 p-3">
           <div className="rounded-lg bg-slate-50 p-2.5 text-[11px] text-slate-500">
-            <div className="font-semibold text-slate-700">TTV Recruitment OS</div>
-            <div className="text-[10px] text-slate-400">Phiên bản hiện đại hóa 2026</div>
+            <div className="font-semibold text-slate-700">
+              TTV Recruitment OS
+            </div>
+            <div className="text-[10px] text-slate-400">
+              Phiên bản hiện đại hóa 2026
+            </div>
           </div>
         </div>
       </aside>
@@ -250,7 +320,9 @@ export default function Navigation({ children }: { children?: React.ReactNode })
                 <Menu className="h-5 w-5" />
               </button>
               <div className="min-w-0">
-                <h1 className="text-base font-bold text-slate-900 truncate">{meta.title}</h1>
+                <h1 className="text-base font-bold text-slate-900 truncate">
+                  {meta.title}
+                </h1>
               </div>
             </div>
 
@@ -273,10 +345,13 @@ export default function Navigation({ children }: { children?: React.ReactNode })
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
                 </span>
                 <span className="text-slate-500">
-                  Chế độ: <strong className="text-slate-700">Trực tuyến 2026</strong>
+                  Chế độ:{" "}
+                  <strong className="text-slate-700">Trực tuyến 2026</strong>
                 </span>
                 <span className="text-slate-300">•</span>
-                <span className="font-medium text-emerald-600">Đã kết nối CSDL</span>
+                <span className="font-medium text-emerald-600">
+                  Đã kết nối CSDL
+                </span>
               </div>
 
               {/* User profile */}
@@ -286,19 +361,24 @@ export default function Navigation({ children }: { children?: React.ReactNode })
                     {user.username.slice(0, 3).toUpperCase()}
                   </div>
                   <div className="hidden sm:block text-left">
-                    <div className="text-xs font-semibold text-slate-800">{user.username}</div>
-                    <div className="text-[10px] text-slate-400">{user.role}</div>
+                    <div className="text-xs font-semibold text-slate-800">
+                      {user.username}
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      {user.role}
+                    </div>
                   </div>
-                  {!user.localAutoView&&<button
-                    onClick={handleLogout}
-                    className="ml-1 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
-                    title="Đăng xuất"
-                  >
-                    <LogOut className="h-4 w-4" />
-                  </button>}
+                  {!user.localAutoView && (
+                    <button
+                      onClick={handleLogout}
+                      className="ml-1 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+                      title="Đăng xuất"
+                    >
+                      <LogOut className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
-              ) : (null
-              )}
+              ) : null}
             </div>
           </div>
         </header>

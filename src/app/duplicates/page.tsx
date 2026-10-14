@@ -1,7 +1,17 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState, useMemo } from 'react';
-import { Table, Button, Tag, Card, message, Alert, Select, Input, Badge } from 'antd';
+import React, { useEffect, useState, useMemo } from "react";
+import {
+  Table,
+  Button,
+  Tag,
+  Card,
+  message,
+  Alert,
+  Select,
+  Input,
+  Badge,
+} from "antd";
 import {
   ShieldAlert,
   Download,
@@ -14,13 +24,13 @@ import {
   Building2,
   Calendar,
   CheckCircle2,
-} from 'lucide-react';
-import type { ColumnsType } from 'antd/es/table';
+} from "lucide-react";
+import type { ColumnsType } from "antd/es/table";
 
 interface DuplicateAlert {
   id: string;
   type: string;
-  severity: 'CRITICAL' | 'HIGH' | 'WARNING' | 'INFO';
+  severity: "CRITICAL" | "HIGH" | "WARNING" | "INFO";
   phone?: string;
   idCard: string;
   fullName: string;
@@ -50,15 +60,15 @@ export default function DuplicatesPage() {
     rehireCount: 0,
   });
   const [loading, setLoading] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<string>('ALL');
-  const [searchKeyword, setSearchKeyword] = useState<string>('');
+  const [typeFilter, setTypeFilter] = useState<string>("ALL");
+  const [searchKeyword, setSearchKeyword] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(20);
 
   const fetchDuplicates = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/duplicates');
+      const res = await fetch("/api/duplicates");
       const json = await res.json();
       if (json.success) {
         setDuplicates(json.data || []);
@@ -66,10 +76,10 @@ export default function DuplicatesPage() {
           setCounts(json.counts);
         }
       } else {
-        message.error(json.message || 'Lỗi tải danh sách cảnh báo trùng');
+        message.error(json.message || "Lỗi tải danh sách cảnh báo trùng");
       }
     } catch {
-      message.error('Lỗi tải danh sách cảnh báo trùng');
+      message.error("Lỗi tải danh sách cảnh báo trùng");
     } finally {
       setLoading(false);
     }
@@ -82,16 +92,27 @@ export default function DuplicatesPage() {
   // Lọc dữ liệu hiển thị
   const filteredDuplicates = useMemo(() => {
     return duplicates.filter((item) => {
-      if (typeFilter !== 'ALL') {
-        if (typeFilter === 'ACTIVE_FACTORY' && item.type !== 'ĐANG LÀM XƯỞNG KHÁC (CHƯA BÁO NGHỈ)') return false;
-        if (typeFilter === 'ACTIVE_PHONE' && item.type !== 'SĐT ĐANG HOẠT ĐỘNG XƯỞNG KHÁC') return false;
-        if (typeFilter === 'PHONE_DUP' && item.type !== 'TRÙNG SĐT') return false;
-        if (typeFilter === 'REHIRE' && !item.type.includes('TÁI TUYỂN DỤNG')) return false;
+      if (typeFilter !== "ALL") {
+        if (
+          typeFilter === "ACTIVE_FACTORY" &&
+          item.type !== "ĐANG LÀM XƯỞNG KHÁC (CHƯA BÁO NGHỈ)"
+        )
+          return false;
+        if (
+          typeFilter === "ACTIVE_PHONE" &&
+          item.type !== "SĐT ĐANG HOẠT ĐỘNG XƯỞNG KHÁC"
+        )
+          return false;
+        if (typeFilter === "PHONE_DUP" && item.type !== "TRÙNG SĐT")
+          return false;
+        if (typeFilter === "REHIRE" && !item.type.includes("TÁI TUYỂN DỤNG"))
+          return false;
       }
 
       if (searchKeyword.trim()) {
         const kw = searchKeyword.trim().toLowerCase();
-        const target = `${item.fullName || ''} ${item.idCard || ''} ${item.phone || ''} ${item.currentFactory || ''} ${item.newFactory || ''} ${item.recruiter || ''} ${item.warning || ''}`.toLowerCase();
+        const target =
+          `${item.fullName || ""} ${item.idCard || ""} ${item.phone || ""} ${item.currentFactory || ""} ${item.newFactory || ""} ${item.recruiter || ""} ${item.warning || ""}`.toLowerCase();
         if (!target.includes(kw)) return false;
       }
 
@@ -101,29 +122,29 @@ export default function DuplicatesPage() {
 
   const handleExportExcel = async () => {
     try {
-      const r = await fetch('/api/excel-engine/export?type=DUPLICATES');
+      const r = await fetch("/api/excel-engine/export?type=DUPLICATES");
       if (!r.ok) {
         const j = await r.json();
         message.error(j.message);
         return;
       }
       const url = URL.createObjectURL(await r.blob());
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = 'CanhBaoTrung_TriThucViet.xlsx';
+      a.download = "CanhBaoTrung_TriThucViet.xlsx";
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch {
-      message.error('Không thể xuất cảnh báo');
+      message.error("Không thể xuất cảnh báo");
     }
   };
 
   const columns: ColumnsType<DuplicateAlert> = [
     {
-      title: 'STT',
-      key: 'stt',
+      title: "STT",
+      key: "stt",
       width: 55,
-      align: 'center',
+      align: "center",
       render: (_, __, idx) => (
         <span className="font-semibold text-slate-500 text-xs">
           {(currentPage - 1) * pageSize + idx + 1}
@@ -131,8 +152,8 @@ export default function DuplicatesPage() {
       ),
     },
     {
-      title: 'Người lao động',
-      key: 'worker',
+      title: "Người lao động",
+      key: "worker",
       width: 210,
       render: (_, r) => (
         <div className="space-y-0.5">
@@ -151,33 +172,43 @@ export default function DuplicatesPage() {
       ),
     },
     {
-      title: 'Phân loại cảnh báo',
-      key: 'type',
+      title: "Phân loại cảnh báo",
+      key: "type",
       width: 220,
       render: (_, r) => {
-        if (r.type === 'ĐANG LÀM XƯỞNG KHÁC (CHƯA BÁO NGHỈ)') {
+        if (r.type === "ĐANG LÀM XƯỞNG KHÁC (CHƯA BÁO NGHỈ)") {
           return (
             <div className="space-y-1">
-              <Tag color="red" className="font-bold text-[11px] m-0 flex items-center gap-1 w-fit">
+              <Tag
+                color="red"
+                className="font-bold text-[11px] m-0 flex items-center gap-1 w-fit"
+              >
                 <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0" />
                 <span>CHƯA BÁO NGHỈ XƯỞNG CŨ</span>
               </Tag>
-              <div className="text-[10px] text-red-600 font-medium">🚨 Ưu tiên xác minh khẩn cấp</div>
+              <div className="text-[10px] text-red-600 font-medium">
+                🚨 Ưu tiên xác minh khẩn cấp
+              </div>
             </div>
           );
         }
-        if (r.type === 'SĐT ĐANG HOẠT ĐỘNG XƯỞNG KHÁC') {
+        if (r.type === "SĐT ĐANG HOẠT ĐỘNG XƯỞNG KHÁC") {
           return (
             <div className="space-y-1">
-              <Tag color="volcano" className="font-bold text-[11px] m-0 flex items-center gap-1 w-fit">
+              <Tag
+                color="volcano"
+                className="font-bold text-[11px] m-0 flex items-center gap-1 w-fit"
+              >
                 <PhoneCall className="w-3.5 h-3.5 text-orange-600 shrink-0" />
                 <span>SĐT ĐANG HOẠT ĐỘNG XƯỞNG KHÁC</span>
               </Tag>
-              <div className="text-[10px] text-orange-600 font-medium">⚠️ Trùng số người đang đi làm</div>
+              <div className="text-[10px] text-orange-600 font-medium">
+                ⚠️ Trùng số người đang đi làm
+              </div>
             </div>
           );
         }
-        if (r.type === 'TRÙNG SĐT') {
+        if (r.type === "TRÙNG SĐT") {
           return (
             <Tag color="orange" className="font-semibold text-[11px] m-0">
               TRÙNG SỐ ĐIỆN THOẠI
@@ -185,7 +216,10 @@ export default function DuplicatesPage() {
           );
         }
         return (
-          <Tag color="cyan" className="font-semibold text-[11px] m-0 flex items-center gap-1 w-fit">
+          <Tag
+            color="cyan"
+            className="font-semibold text-[11px] m-0 flex items-center gap-1 w-fit"
+          >
             <UserCheck className="w-3.5 h-3.5 text-cyan-700 shrink-0" />
             <span>TÁI TUYỂN DỤNG (RE-HIRE)</span>
           </Tag>
@@ -193,14 +227,15 @@ export default function DuplicatesPage() {
       },
     },
     {
-      title: 'Xưởng hiện tại (Chưa nghỉ)',
-      key: 'currentFactory',
+      title: "Xưởng hiện tại (Chưa nghỉ)",
+      key: "currentFactory",
       width: 190,
       render: (_, r) => (
         <div className="text-xs space-y-0.5">
           <div className="font-semibold text-slate-800">{r.currentFactory}</div>
           <div className="text-[11px] text-slate-500">
-            Trạng thái: <strong className="text-slate-700">{r.currentStatus}</strong>
+            Trạng thái:{" "}
+            <strong className="text-slate-700">{r.currentStatus}</strong>
           </div>
           {r.recruiter && (
             <div className="text-[10px] text-slate-400">
@@ -211,17 +246,19 @@ export default function DuplicatesPage() {
       ),
     },
     {
-      title: 'Xưởng mới phát sinh',
-      key: 'newFactory',
+      title: "Xưởng mới phát sinh",
+      key: "newFactory",
       width: 190,
       render: (_, r) => (
         <div className="text-xs space-y-0.5">
           <div className="font-semibold text-slate-800">{r.newFactory}</div>
           <div className="text-[11px] text-slate-500">
-            {r.newInterviewDate && r.newInterviewDate !== '—' ? `Ngày PV: ${r.newInterviewDate}` : ''}
-            {r.newStatus && r.newStatus !== '—' ? ` (${r.newStatus})` : ''}
+            {r.newInterviewDate && r.newInterviewDate !== "—"
+              ? `Ngày PV: ${r.newInterviewDate}`
+              : ""}
+            {r.newStatus && r.newStatus !== "—" ? ` (${r.newStatus})` : ""}
           </div>
-          {r.newRecruiter && r.newRecruiter !== '—' && (
+          {r.newRecruiter && r.newRecruiter !== "—" && (
             <div className="text-[10px] text-slate-400">
               TD mới: {r.newRecruiter}
             </div>
@@ -230,16 +267,23 @@ export default function DuplicatesPage() {
       ),
     },
     {
-      title: 'Chi tiết & Hướng xử lý đề xuất',
-      key: 'warningDetail',
+      title: "Chi tiết & Hướng xử lý đề xuất",
+      key: "warningDetail",
       render: (_, r) => {
-        const isCritical = r.type.includes('CHƯA BÁO NGHỈ') || r.type.includes('ĐANG HOẠT ĐỘNG');
+        const isCritical =
+          r.type.includes("CHƯA BÁO NGHỈ") || r.type.includes("ĐANG HOẠT ĐỘNG");
         return (
-          <div className={`p-2 rounded-lg text-xs space-y-1 ${isCritical ? 'bg-rose-50/80 border border-rose-200' : 'bg-slate-50 border border-slate-200'}`}>
-            <div className={`font-semibold ${isCritical ? 'text-rose-900' : 'text-slate-800'}`}>
+          <div
+            className={`p-2 rounded-lg text-xs space-y-1 ${isCritical ? "bg-rose-50/80 border border-rose-200" : "bg-slate-50 border border-slate-200"}`}
+          >
+            <div
+              className={`font-semibold ${isCritical ? "text-rose-900" : "text-slate-800"}`}
+            >
               {r.warning}
             </div>
-            <div className={`text-[11px] flex items-start gap-1 ${isCritical ? 'text-rose-700 font-medium' : 'text-slate-600'}`}>
+            <div
+              className={`text-[11px] flex items-start gap-1 ${isCritical ? "text-rose-700 font-medium" : "text-slate-600"}`}
+            >
               <span className="shrink-0 font-bold">👉 Hướng xử lý:</span>
               <span>{r.actionRequired}</span>
             </div>
@@ -259,14 +303,27 @@ export default function DuplicatesPage() {
             <span>Cảnh báo Trùng lặp & Nhảy xưởng chưa báo nghỉ</span>
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Phát hiện tức thì công nhân chưa hoàn tất thủ tục nghỉ việc tại xưởng cũ nhưng đã đăng ký xưởng mới.
+            Phát hiện tức thì công nhân chưa hoàn tất thủ tục nghỉ việc tại
+            xưởng cũ nhưng đã đăng ký xưởng mới.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />} onClick={fetchDuplicates}>
+          <Button
+            icon={
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
+              />
+            }
+            onClick={fetchDuplicates}
+          >
             Quét lại
           </Button>
-          <Button type="primary" danger icon={<Download className="w-3.5 h-3.5" />} onClick={handleExportExcel}>
+          <Button
+            type="primary"
+            danger
+            icon={<Download className="w-3.5 h-3.5" />}
+            onClick={handleExportExcel}
+          >
             Xuất Excel Cảnh báo
           </Button>
         </div>
@@ -276,9 +333,11 @@ export default function DuplicatesPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Card
           size="small"
-          className={`cursor-pointer transition-all border-rose-300 bg-rose-50/50 hover:shadow-sm ${typeFilter === 'ACTIVE_FACTORY' ? 'ring-2 ring-rose-500' : ''}`}
+          className={`cursor-pointer transition-all border-rose-300 bg-rose-50/50 hover:shadow-sm ${typeFilter === "ACTIVE_FACTORY" ? "ring-2 ring-rose-500" : ""}`}
           onClick={() => {
-            setTypeFilter(typeFilter === 'ACTIVE_FACTORY' ? 'ALL' : 'ACTIVE_FACTORY');
+            setTypeFilter(
+              typeFilter === "ACTIVE_FACTORY" ? "ALL" : "ACTIVE_FACTORY",
+            );
             setCurrentPage(1);
           }}
         >
@@ -290,7 +349,9 @@ export default function DuplicatesPage() {
           </div>
           <div className="mt-1 text-2xl font-bold text-rose-700">
             {counts.activeFactoryCount}
-            <span className="text-xs font-normal text-slate-500 ml-1">hồ sơ</span>
+            <span className="text-xs font-normal text-slate-500 ml-1">
+              hồ sơ
+            </span>
           </div>
           <p className="mt-0.5 text-[11px] text-rose-600 font-medium truncate">
             🚨 Ưu tiên gọi xác minh trước khi xếp xe
@@ -299,9 +360,11 @@ export default function DuplicatesPage() {
 
         <Card
           size="small"
-          className={`cursor-pointer transition-all border-orange-300 bg-orange-50/50 hover:shadow-sm ${typeFilter === 'ACTIVE_PHONE' ? 'ring-2 ring-orange-500' : ''}`}
+          className={`cursor-pointer transition-all border-orange-300 bg-orange-50/50 hover:shadow-sm ${typeFilter === "ACTIVE_PHONE" ? "ring-2 ring-orange-500" : ""}`}
           onClick={() => {
-            setTypeFilter(typeFilter === 'ACTIVE_PHONE' ? 'ALL' : 'ACTIVE_PHONE');
+            setTypeFilter(
+              typeFilter === "ACTIVE_PHONE" ? "ALL" : "ACTIVE_PHONE",
+            );
             setCurrentPage(1);
           }}
         >
@@ -313,7 +376,9 @@ export default function DuplicatesPage() {
           </div>
           <div className="mt-1 text-2xl font-bold text-orange-700">
             {counts.activePhoneCount}
-            <span className="text-xs font-normal text-slate-500 ml-1">trường hợp</span>
+            <span className="text-xs font-normal text-slate-500 ml-1">
+              trường hợp
+            </span>
           </div>
           <p className="mt-0.5 text-[11px] text-orange-600 font-medium truncate">
             ⚠️ SĐT của công nhân đang làm xưởng khác
@@ -322,9 +387,9 @@ export default function DuplicatesPage() {
 
         <Card
           size="small"
-          className={`cursor-pointer transition-all border-amber-300 bg-amber-50/50 hover:shadow-sm ${typeFilter === 'PHONE_DUP' ? 'ring-2 ring-amber-500' : ''}`}
+          className={`cursor-pointer transition-all border-amber-300 bg-amber-50/50 hover:shadow-sm ${typeFilter === "PHONE_DUP" ? "ring-2 ring-amber-500" : ""}`}
           onClick={() => {
-            setTypeFilter(typeFilter === 'PHONE_DUP' ? 'ALL' : 'PHONE_DUP');
+            setTypeFilter(typeFilter === "PHONE_DUP" ? "ALL" : "PHONE_DUP");
             setCurrentPage(1);
           }}
         >
@@ -336,7 +401,9 @@ export default function DuplicatesPage() {
           </div>
           <div className="mt-1 text-2xl font-bold text-slate-900">
             {counts.generalPhoneCount}
-            <span className="text-xs font-normal text-slate-500 ml-1">trường hợp</span>
+            <span className="text-xs font-normal text-slate-500 ml-1">
+              trường hợp
+            </span>
           </div>
           <p className="mt-0.5 text-[11px] text-slate-600 truncate">
             Dùng chung SĐT người thân hoặc nhầm số
@@ -345,9 +412,9 @@ export default function DuplicatesPage() {
 
         <Card
           size="small"
-          className={`cursor-pointer transition-all border-cyan-300 bg-cyan-50/50 hover:shadow-sm ${typeFilter === 'REHIRE' ? 'ring-2 ring-cyan-500' : ''}`}
+          className={`cursor-pointer transition-all border-cyan-300 bg-cyan-50/50 hover:shadow-sm ${typeFilter === "REHIRE" ? "ring-2 ring-cyan-500" : ""}`}
           onClick={() => {
-            setTypeFilter(typeFilter === 'REHIRE' ? 'ALL' : 'REHIRE');
+            setTypeFilter(typeFilter === "REHIRE" ? "ALL" : "REHIRE");
             setCurrentPage(1);
           }}
         >
@@ -359,7 +426,9 @@ export default function DuplicatesPage() {
           </div>
           <div className="mt-1 text-2xl font-bold text-slate-900">
             {counts.rehireCount}
-            <span className="text-xs font-normal text-slate-500 ml-1">lao động</span>
+            <span className="text-xs font-normal text-slate-500 ml-1">
+              lao động
+            </span>
           </div>
           <p className="mt-0.5 text-[11px] text-slate-600 truncate">
             Lao động đã báo nghỉ quay lại làm việc
@@ -400,20 +469,35 @@ export default function DuplicatesPage() {
                 setCurrentPage(1);
               }}
               options={[
-                { label: `Tất cả loại cảnh báo (${duplicates.length})`, value: 'ALL' },
-                { label: `🚨 Đang làm xưởng khác (Chưa báo nghỉ) (${counts.activeFactoryCount})`, value: 'ACTIVE_FACTORY' },
-                { label: `📱 SĐT đang hoạt động xưởng khác (${counts.activePhoneCount})`, value: 'ACTIVE_PHONE' },
-                { label: `⚠️ Trùng số điện thoại (${counts.generalPhoneCount})`, value: 'PHONE_DUP' },
-                { label: `🔄 Tái tuyển dụng (Đã báo nghỉ) (${counts.rehireCount})`, value: 'REHIRE' },
+                {
+                  label: `Tất cả loại cảnh báo (${duplicates.length})`,
+                  value: "ALL",
+                },
+                {
+                  label: `🚨 Đang làm xưởng khác (Chưa báo nghỉ) (${counts.activeFactoryCount})`,
+                  value: "ACTIVE_FACTORY",
+                },
+                {
+                  label: `📱 SĐT đang hoạt động xưởng khác (${counts.activePhoneCount})`,
+                  value: "ACTIVE_PHONE",
+                },
+                {
+                  label: `⚠️ Trùng số điện thoại (${counts.generalPhoneCount})`,
+                  value: "PHONE_DUP",
+                },
+                {
+                  label: `🔄 Tái tuyển dụng (Đã báo nghỉ) (${counts.rehireCount})`,
+                  value: "REHIRE",
+                },
               ]}
             />
 
-            {(typeFilter !== 'ALL' || searchKeyword) && (
+            {(typeFilter !== "ALL" || searchKeyword) && (
               <Button
                 size="middle"
                 onClick={() => {
-                  setTypeFilter('ALL');
-                  setSearchKeyword('');
+                  setTypeFilter("ALL");
+                  setSearchKeyword("");
                   setCurrentPage(1);
                 }}
                 className="text-xs"
@@ -424,7 +508,8 @@ export default function DuplicatesPage() {
           </div>
 
           <div className="text-xs text-slate-500 font-medium">
-            Hiển thị <strong>{filteredDuplicates.length}</strong> / {duplicates.length} cảnh báo
+            Hiển thị <strong>{filteredDuplicates.length}</strong> /{" "}
+            {duplicates.length} cảnh báo
           </div>
         </div>
       </Card>
@@ -441,12 +526,13 @@ export default function DuplicatesPage() {
             current: currentPage,
             pageSize: pageSize,
             showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100'],
+            pageSizeOptions: ["10", "20", "50", "100"],
             onChange: (page, size) => {
               setCurrentPage(page);
               setPageSize(size);
             },
-            showTotal: (total, range) => `${range[0]} - ${range[1]} / ${total} cảnh báo`,
+            showTotal: (total, range) =>
+              `${range[0]} - ${range[1]} / ${total} cảnh báo`,
           }}
           size="middle"
         />

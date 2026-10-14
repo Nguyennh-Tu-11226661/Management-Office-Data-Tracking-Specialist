@@ -1,8 +1,19 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { Card, Input, Button, Form, message, Tag, Table, Divider } from 'antd';
-import { Search, Building2, Coins, CreditCard, Calendar, Clock, AlertTriangle, CheckCircle2, Briefcase, FileText } from 'lucide-react';
+import React, { useState } from "react";
+import { Card, Input, Button, Form, message, Tag, Table, Divider } from "antd";
+import {
+  Search,
+  Building2,
+  Coins,
+  CreditCard,
+  Calendar,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  Briefcase,
+  FileText,
+} from "lucide-react";
 
 export default function LookupPage() {
   const [loading, setLoading] = useState(false);
@@ -13,9 +24,9 @@ export default function LookupPage() {
     try {
       setLoading(true);
       setResult(null);
-      const res = await fetch('/api/lookup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
       });
       const json = await res.json();
@@ -25,7 +36,7 @@ export default function LookupPage() {
         message.error(json.message);
       }
     } catch (err) {
-      message.error('Lỗi kết nối tra cứu');
+      message.error("Lỗi kết nối tra cứu");
     } finally {
       setLoading(false);
     }
@@ -42,7 +53,8 @@ export default function LookupPage() {
           Cổng Tra Cứu Hồ Sơ & Lịch Sử Làm Việc Đa Công Ty
         </h1>
         <p className="text-xs text-slate-500 max-w-lg mx-auto">
-          Tra cứu toàn bộ lịch sử các công ty/nhà máy từng làm việc qua hệ thống, ngày bắt đầu, ngày nghỉ, và chi tiết các khoản thưởng đã nhận.
+          Tra cứu toàn bộ lịch sử các công ty/nhà máy từng làm việc qua hệ
+          thống, ngày bắt đầu, ngày nghỉ, và chi tiết các khoản thưởng đã nhận.
         </p>
       </div>
 
@@ -52,17 +64,20 @@ export default function LookupPage() {
           <Form.Item
             name="idCard"
             label="Số Thẻ Căn Cước Công Dân (CCCD)"
-            rules={[{ required: true, message: 'Vui lòng nhập số CCCD' }]}
+            rules={[{ required: true, message: "Vui lòng nhập số CCCD" }]}
           >
-            <Input size="large" placeholder="Nhập 12 chữ số CCCD hoặc 9 số CMT..." />
+            <Input
+              size="large"
+              placeholder="Nhập 12 chữ số CCCD hoặc 9 số CMT..."
+            />
           </Form.Item>
 
           <Form.Item
             name="lastPhone4"
             label="4 Số Cuối Điện Thoại Đăng Ký"
             rules={[
-              { required: true, message: 'Vui lòng nhập 4 số cuối SĐT' },
-              { pattern: /^\d{4}$/, message: 'Phải đúng 4 chữ số' },
+              { required: true, message: "Vui lòng nhập 4 số cuối SĐT" },
+              { pattern: /^\d{4}$/, message: "Phải đúng 4 chữ số" },
             ]}
             extra="Nhập 4 số cuối số điện thoại để đối chiếu xác thực hồ sơ."
           >
@@ -92,18 +107,34 @@ export default function LookupPage() {
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                   Hồ sơ người lao động
                 </span>
-                <h2 className="text-2xl font-black text-slate-900 mt-0.5">{result.fullName}</h2>
+                <h2 className="text-2xl font-black text-slate-900 mt-0.5">
+                  {result.fullName}
+                </h2>
                 <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-3">
-                  <span>CCCD: <strong className="font-mono text-slate-700">{result.idCard}</strong></span>
+                  <span>
+                    CCCD:{" "}
+                    <strong className="font-mono text-slate-700">
+                      {result.idCard}
+                    </strong>
+                  </span>
                   {result.phone && (
-                    <span>SĐT: <strong className="font-mono text-slate-700">{result.phone}</strong></span>
+                    <span>
+                      SĐT:{" "}
+                      <strong className="font-mono text-slate-700">
+                        {result.phone}
+                      </strong>
+                    </span>
                   )}
                 </div>
               </div>
 
               <div className="text-left sm:text-right">
-                <Tag color="blue" className="text-sm px-3 py-1 font-semibold rounded-full">
-                  Đã làm việc tại {result.companies?.length || 1} công ty / nhà máy
+                <Tag
+                  color="blue"
+                  className="text-sm px-3 py-1 font-semibold rounded-full"
+                >
+                  Đã làm việc tại {result.companies?.length || 1} công ty / nhà
+                  máy
                 </Tag>
               </div>
             </div>
@@ -115,12 +146,19 @@ export default function LookupPage() {
                   <CreditCard className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-slate-400">Tài khoản ngân hàng nhận tiền thưởng</div>
+                  <div className="text-slate-400">
+                    Tài khoản ngân hàng nhận tiền thưởng
+                  </div>
                   <div className="font-bold text-slate-800 text-sm mt-0.5">
                     {result.bankAccount ? (
-                      <span>{result.bankAccount.accountNumber} · {result.bankAccount.bankName}</span>
+                      <span>
+                        {result.bankAccount.accountNumber} ·{" "}
+                        {result.bankAccount.bankName}
+                      </span>
                     ) : (
-                      <span className="text-rose-500">Chưa ghi nhận số tài khoản</span>
+                      <span className="text-rose-500">
+                        Chưa ghi nhận số tài khoản
+                      </span>
                     )}
                   </div>
                 </div>
@@ -132,7 +170,8 @@ export default function LookupPage() {
           <div className="flex items-center gap-2 px-1">
             <Briefcase className="w-5 h-5 text-blue-600" />
             <h3 className="text-lg font-bold text-slate-900">
-              Chi Tiết Từng Công Ty Đã Làm Việc & Tiền Thưởng ({result.companies?.length || 0} lượt)
+              Chi Tiết Từng Công Ty Đã Làm Việc & Tiền Thưởng (
+              {result.companies?.length || 0} lượt)
             </h3>
           </div>
 
@@ -140,28 +179,43 @@ export default function LookupPage() {
           <div className="space-y-4">
             {result.companies && result.companies.length > 0 ? (
               result.companies.map((comp: any, idx: number) => {
-                const isWorking = comp.status === 'Đang làm việc';
-                const hasLeft = comp.status === 'Đã nghỉ việc' || !!comp.leaveDate;
+                const isWorking = comp.status === "Đang làm việc";
+                const hasLeft =
+                  comp.status === "Đã nghỉ việc" || !!comp.leaveDate;
 
                 return (
                   <Card
                     key={comp.id || idx}
                     className={`shadow-md rounded-2xl border ${
-                      isWorking ? 'border-emerald-300 bg-emerald-50/10' : 'border-slate-200 bg-white'
+                      isWorking
+                        ? "border-emerald-300 bg-emerald-50/10"
+                        : "border-slate-200 bg-white"
                     }`}
                   >
                     {/* Header Công ty */}
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b pb-3">
                       <div className="flex items-center gap-3">
-                        <div className={`p-2.5 rounded-xl ${isWorking ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
+                        <div
+                          className={`p-2.5 rounded-xl ${isWorking ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-700"}`}
+                        >
                           <Building2 className="w-5 h-5" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-bold text-slate-400 uppercase">
-                              Lượt {result.companies.length - idx} {idx === 0 && '· Mới nhất'}
+                              Lượt {result.companies.length - idx}{" "}
+                              {idx === 0 && "· Mới nhất"}
                             </span>
-                            <Tag color={isWorking ? 'success' : hasLeft ? 'error' : 'default'} className="font-semibold">
+                            <Tag
+                              color={
+                                isWorking
+                                  ? "success"
+                                  : hasLeft
+                                    ? "error"
+                                    : "default"
+                              }
+                              className="font-semibold"
+                            >
                               {comp.status}
                             </Tag>
                           </div>
@@ -173,9 +227,11 @@ export default function LookupPage() {
 
                       {/* Tổng thưởng tại công ty này */}
                       <div className="text-left sm:text-right bg-amber-50/60 sm:bg-transparent p-2 sm:p-0 rounded-xl">
-                        <span className="text-xs text-slate-500">Thưởng nhận tại công ty này:</span>
+                        <span className="text-xs text-slate-500">
+                          Thưởng nhận tại công ty này:
+                        </span>
                         <div className="text-lg font-black text-emerald-700">
-                          {(comp.totalBonus || 0).toLocaleString('vi-VN')} đ
+                          {(comp.totalBonus || 0).toLocaleString("vi-VN")} đ
                         </div>
                       </div>
                     </div>
@@ -188,17 +244,27 @@ export default function LookupPage() {
                           Ngày PV / Bắt đầu làm việc
                         </span>
                         <div className="font-bold text-slate-800 text-sm mt-1">
-                          {comp.startDate || comp.interviewDate || '—'}
+                          {comp.startDate || comp.interviewDate || "—"}
                         </div>
                       </div>
 
-                      <div className={`p-3 rounded-xl ${hasLeft ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50'}`}>
-                        <span className={`${hasLeft ? 'text-rose-500 font-semibold' : 'text-slate-400'} flex items-center gap-1`}>
+                      <div
+                        className={`p-3 rounded-xl ${hasLeft ? "bg-rose-50 border border-rose-100" : "bg-slate-50"}`}
+                      >
+                        <span
+                          className={`${hasLeft ? "text-rose-500 font-semibold" : "text-slate-400"} flex items-center gap-1`}
+                        >
                           <Clock className="w-3.5 h-3.5" />
                           Ngày nghỉ việc
                         </span>
-                        <div className={`text-sm mt-1 font-bold ${hasLeft ? 'text-rose-700' : 'text-slate-800'}`}>
-                          {comp.leaveDate ? comp.leaveDate : (isWorking ? 'Đang làm việc' : '—')}
+                        <div
+                          className={`text-sm mt-1 font-bold ${hasLeft ? "text-rose-700" : "text-slate-800"}`}
+                        >
+                          {comp.leaveDate
+                            ? comp.leaveDate
+                            : isWorking
+                              ? "Đang làm việc"
+                              : "—"}
                         </div>
                       </div>
 
@@ -208,7 +274,9 @@ export default function LookupPage() {
                           Số công / Hợp đồng
                         </span>
                         <div className="font-bold text-slate-800 text-sm mt-1">
-                          {comp.confirmedWorkDays != null ? `${comp.confirmedWorkDays} công` : comp.contractType || 'Thời vụ'}
+                          {comp.confirmedWorkDays != null
+                            ? `${comp.confirmedWorkDays} công`
+                            : comp.contractType || "Thời vụ"}
                         </div>
                       </div>
                     </div>
@@ -218,8 +286,12 @@ export default function LookupPage() {
                       <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs flex items-start gap-2">
                         <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                         <div>
-                          <strong className="text-rose-800">Lý do nghỉ việc:</strong>{' '}
-                          <span className="text-rose-700">{comp.leaveReason}</span>
+                          <strong className="text-rose-800">
+                            Lý do nghỉ việc:
+                          </strong>{" "}
+                          <span className="text-rose-700">
+                            {comp.leaveReason}
+                          </span>
                         </div>
                       </div>
                     )}
@@ -242,17 +314,23 @@ export default function LookupPage() {
                               <div className="flex items-center gap-2">
                                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                                 <div>
-                                  <span className="font-bold text-slate-800">Mốc {p.stageLabel}</span>
+                                  <span className="font-bold text-slate-800">
+                                    Mốc {p.stageLabel}
+                                  </span>
                                   {p.paidOn && (
-                                    <span className="text-slate-500 ml-2">· Ngày chi trả: {p.paidOn}</span>
+                                    <span className="text-slate-500 ml-2">
+                                      · Ngày chi trả: {p.paidOn}
+                                    </span>
                                   )}
                                   {p.reference && (
-                                    <div className="text-[11px] font-mono text-slate-400">Chứng từ: {p.reference}</div>
+                                    <div className="text-[11px] font-mono text-slate-400">
+                                      Chứng từ: {p.reference}
+                                    </div>
                                   )}
                                 </div>
                               </div>
                               <div className="font-black text-emerald-700 text-sm text-right">
-                                +{Number(p.amount).toLocaleString('vi-VN')} đ
+                                +{Number(p.amount).toLocaleString("vi-VN")} đ
                               </div>
                             </div>
                           ))}
@@ -266,17 +344,31 @@ export default function LookupPage() {
                               className="p-2.5 rounded-lg border border-slate-200 bg-amber-50/30 flex items-center justify-between text-xs"
                             >
                               <div>
-                                <span className="font-bold text-slate-800">Kỳ {b.month}</span>
+                                <span className="font-bold text-slate-800">
+                                  Kỳ {b.month}
+                                </span>
                                 <div className="text-[11px] text-slate-500">
-                                  Lần 1: {(b.bonus1 || 0).toLocaleString()}đ | Lần 2: {(b.bonus2 || 0).toLocaleString()}đ | Lần 3: {(b.bonus3 || 0).toLocaleString()}đ
+                                  Lần 1: {(b.bonus1 || 0).toLocaleString()}đ |
+                                  Lần 2: {(b.bonus2 || 0).toLocaleString()}đ |
+                                  Lần 3: {(b.bonus3 || 0).toLocaleString()}đ
                                 </div>
                               </div>
                               <div className="text-right">
                                 <div className="font-black text-emerald-700 text-sm">
-                                  {(b.totalBonus || 0).toLocaleString('vi-VN')} đ
+                                  {(b.totalBonus || 0).toLocaleString("vi-VN")}{" "}
+                                  đ
                                 </div>
-                                <Tag color={b.status === 'APPROVED' ? 'success' : 'processing'} className="text-[10px]">
-                                  {b.status === 'APPROVED' ? 'Đã duyệt chi trả' : 'Đang xử lý'}
+                                <Tag
+                                  color={
+                                    b.status === "APPROVED"
+                                      ? "success"
+                                      : "processing"
+                                  }
+                                  className="text-[10px]"
+                                >
+                                  {b.status === "APPROVED"
+                                    ? "Đã duyệt chi trả"
+                                    : "Đang xử lý"}
                                 </Tag>
                               </div>
                             </div>
@@ -284,7 +376,8 @@ export default function LookupPage() {
                         </div>
                       ) : (
                         <div className="text-xs text-slate-400 italic py-2">
-                          Chưa có phát sinh tiền thưởng ghi nhận tại công ty này.
+                          Chưa có phát sinh tiền thưởng ghi nhận tại công ty
+                          này.
                         </div>
                       )}
                     </div>

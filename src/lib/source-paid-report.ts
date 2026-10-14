@@ -1,37 +1,194 @@
-import {dateKey} from '@/lib/worker-validation';
-import {sourceHeader,sourceRewardAmount} from '@/lib/source-format';
-import {splitImportReview} from '@/lib/import-review';
-const norm=(v:unknown)=>String(v??'').normalize('NFC').replace(/\s+/g,' ').trim().toLocaleLowerCase('vi');
-export function sourcePaidReport(sources:any[],workers:any[],imported:any[],p:URLSearchParams){
- const people=new Map(workers.map(w=>[String(w.idCard),w]));const unique=new Map<string,any>();let skippedDuplicates=0;
- for(const source of sources.filter(s=>s.type==='DS_THUONG'))for(const r of source.rows){
-  const v=Object.fromEntries(Object.entries(r.values||{}).map(([k,value])=>[sourceHeader(k),value]));
-  if(!Array.from({length:7},(_,i)=>`Thưởng lần ${i+1}`).some(k=>k in v))continue;
-  if(splitImportReview([...(r.warnings||[]),...(r.duplicates||[])]).duplicates.length){skippedDuplicates++;continue;}
-  const card=String(v['Số CCCD']||v['số CCCD']||v.CCCD||'').trim(),company=String(v['Công ty']||'').trim(),pv=String(v['Ngày PV']||'').trim(),code=String(v['Mã nhân viên']||v['Mã NV']||'').trim();
-  const rewards=Array.from({length:7},(_,i)=>String(v[`Thưởng lần ${i+1}`]??'').trim());
-  const key=card&&company&&dateKey(pv)?JSON.stringify([card,norm(company),dateKey(pv),code]):`unlinked-${source.id}-${r.row}`;
-  const signature=JSON.stringify(rewards.map(norm));
-  if(unique.has(key)){const old=unique.get(key);if(old.signature===signature)skippedDuplicates++;else old.conflicting=true;continue;}
-  const worker=people.get(card);if(worker?.archivedAt)continue;
-  const assignments=(worker?.assignments||[]).filter((a:any)=>norm(a.workingFactory||a.interviewFactory)===norm(company)&&dateKey(a.interviewDate||'')===dateKey(pv)&&(!code||String(a.employeeCode||worker.code||'')===code));
-  let paid=0;const warnings:string[]=[];for(const reward of rewards)try{paid+=sourceRewardAmount(reward);}catch{warnings.push('Có nội dung tiền chưa đọc được; cần đối chiếu');}
-  unique.set(key,{id:`source-${source.id}-${r.row}`,key,signature,name:String(v['Họ tên']||v['Họ và tên']||worker?.fullName||''),idCard:card,company,month:String(v.Tháng||''),interviewDate:pv,workerCode:code,policy:String(v['Chính sách']||''),paid,sourceRewards:rewards.join(' · '),sourceFile:source.file,sourceRow:r.row,linked:assignments.length===1,assignment:assignments.length===1?assignments[0]:null,worker,warnings,conflicting:false});
- }
- // Retain older source imports without a raw snapshot; do not double count records already represented by source.
- for(const b of imported){if(b.worker?.archivedAt)continue;let note:any;try{note=JSON.parse(b.note||'{}');}catch{continue;}if(note.source!=='SOURCE_EXCEL_ACTUAL_PAID')continue;
-  const card=String(b.worker?.idCard||''),company=b.company||'',pv=b.interviewDate||b.assignment?.interviewDate||'',code=b.workerCode||'';const key=JSON.stringify([card,norm(company),dateKey(pv),code]);if(unique.has(key))continue;
-  unique.set(key,{id:b.id,key,name:b.worker?.fullName||'',idCard:card,company,month:note.monthOriginal||b.month,interviewDate:pv,workerCode:code,policy:b.policy,paid:b.totalBonus||0,sourceRewards:(note.rewards||[]).join(' · '),linked:!!b.assignment,assignment:b.assignment,worker:b.worker,warnings:[],conflicting:false});
- }
- const selectedCompany=p.get('interviewFactory')||p.get('factory');
- const rows=[...unique.values()].filter(r=>{
-  const d=dateKey(r.interviewDate);if(selectedCompany&&norm(r.company)!==norm(selectedCompany))return false;
-  if(p.get('month')&&d?.slice(0,7)!==p.get('month')||p.get('from')&&(!d||d<p.get('from')!)||p.get('to')&&(!d||d>p.get('to')!))return false;
-  for(const key of ['orderId','batchId'])if(p.get(key)&&r.assignment?.[key]!==p.get(key))return false;
-  for(const key of ['recruiter','team'])if(p.get(key)&&(r.assignment?.[key]||r.worker?.[key])!==p.get(key))return false;
-  if(p.get('search')&&![r.name,r.idCard,r.workerCode].some(v=>norm(v).includes(norm(p.get('search')))))return false;
-  return true;
- }).map(({signature,key,assignment,worker,...r})=>({...r,status:r.conflicting?'Khoản khác nhau cùng hồ sơ — chờ đối chiếu':r.warnings.length?'Cần kiểm tra số tiền':r.linked?'Đã liên kết hồ sơ':'Nguồn Excel — chưa liên kết đợt',counted:!r.conflicting&&!r.warnings.length}));
- const groups=new Map<string,any>();for(const r of rows){const g=groups.get(r.company)||{name:r.company||'Chưa xác định công ty',rows:0,paid:0,unlinked:0,pending:0};g.rows++;if(r.counted)g.paid+=r.paid;else g.pending++;if(!r.linked)g.unlinked++;groups.set(r.company,g);}
- return {total:rows.filter(r=>r.counted).reduce((n,r)=>n+r.paid,0),rows,companies:[...groups.values()],unlinked:rows.filter(r=>!r.linked).length,pending:rows.filter(r=>!r.counted).length,skippedDuplicates};
+import { dateKey } from "@/lib/worker-validation";
+import { sourceHeader, sourceRewardAmount } from "@/lib/source-format";
+import { splitImportReview } from "@/lib/import-review";
+const norm = (v: unknown) =>
+  String(v ?? "")
+    .normalize("NFC")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleLowerCase("vi");
+export function sourcePaidReport(
+  sources: any[],
+  workers: any[],
+  imported: any[],
+  p: URLSearchParams,
+) {
+  const people = new Map(workers.map((w) => [String(w.idCard), w]));
+  const unique = new Map<string, any>();
+  let skippedDuplicates = 0;
+  for (const source of sources.filter((s) => s.type === "DS_THUONG"))
+    for (const r of source.rows) {
+      const v = Object.fromEntries(
+        Object.entries(r.values || {}).map(([k, value]) => [
+          sourceHeader(k),
+          value,
+        ]),
+      );
+      if (
+        !Array.from({ length: 7 }, (_, i) => `Thưởng lần ${i + 1}`).some(
+          (k) => k in v,
+        )
+      )
+        continue;
+      if (
+        splitImportReview([...(r.warnings || []), ...(r.duplicates || [])])
+          .duplicates.length
+      ) {
+        skippedDuplicates++;
+        continue;
+      }
+      const card = String(v["Số CCCD"] || v["số CCCD"] || v.CCCD || "").trim(),
+        company = String(v["Công ty"] || "").trim(),
+        pv = String(v["Ngày PV"] || "").trim(),
+        code = String(v["Mã nhân viên"] || v["Mã NV"] || "").trim();
+      const rewards = Array.from({ length: 7 }, (_, i) =>
+        String(v[`Thưởng lần ${i + 1}`] ?? "").trim(),
+      );
+      const key =
+        card && company && dateKey(pv)
+          ? JSON.stringify([card, norm(company), dateKey(pv), code])
+          : `unlinked-${source.id}-${r.row}`;
+      const signature = JSON.stringify(rewards.map(norm));
+      if (unique.has(key)) {
+        const old = unique.get(key);
+        if (old.signature === signature) skippedDuplicates++;
+        else old.conflicting = true;
+        continue;
+      }
+      const worker = people.get(card);
+      if (worker?.archivedAt) continue;
+      const assignments = (worker?.assignments || []).filter(
+        (a: any) =>
+          norm(a.workingFactory || a.interviewFactory) === norm(company) &&
+          dateKey(a.interviewDate || "") === dateKey(pv) &&
+          (!code || String(a.employeeCode || worker.code || "") === code),
+      );
+      let paid = 0;
+      const warnings: string[] = [];
+      for (const reward of rewards)
+        try {
+          paid += sourceRewardAmount(reward);
+        } catch {
+          warnings.push("Có nội dung tiền chưa đọc được; cần đối chiếu");
+        }
+      unique.set(key, {
+        id: `source-${source.id}-${r.row}`,
+        key,
+        signature,
+        name: String(v["Họ tên"] || v["Họ và tên"] || worker?.fullName || ""),
+        idCard: card,
+        company,
+        month: String(v.Tháng || ""),
+        interviewDate: pv,
+        workerCode: code,
+        policy: String(v["Chính sách"] || ""),
+        paid,
+        sourceRewards: rewards.join(" · "),
+        sourceFile: source.file,
+        sourceRow: r.row,
+        linked: assignments.length === 1,
+        assignment: assignments.length === 1 ? assignments[0] : null,
+        worker,
+        warnings,
+        conflicting: false,
+      });
+    }
+  // Retain older source imports without a raw snapshot; do not double count records already represented by source.
+  for (const b of imported) {
+    if (b.worker?.archivedAt) continue;
+    let note: any;
+    try {
+      note = JSON.parse(b.note || "{}");
+    } catch {
+      continue;
+    }
+    if (note.source !== "SOURCE_EXCEL_ACTUAL_PAID") continue;
+    const card = String(b.worker?.idCard || ""),
+      company = b.company || "",
+      pv = b.interviewDate || b.assignment?.interviewDate || "",
+      code = b.workerCode || "";
+    const key = JSON.stringify([card, norm(company), dateKey(pv), code]);
+    if (unique.has(key)) continue;
+    unique.set(key, {
+      id: b.id,
+      key,
+      name: b.worker?.fullName || "",
+      idCard: card,
+      company,
+      month: note.monthOriginal || b.month,
+      interviewDate: pv,
+      workerCode: code,
+      policy: b.policy,
+      paid: b.totalBonus || 0,
+      sourceRewards: (note.rewards || []).join(" · "),
+      linked: !!b.assignment,
+      assignment: b.assignment,
+      worker: b.worker,
+      warnings: [],
+      conflicting: false,
+    });
+  }
+  const selectedCompany = p.get("interviewFactory") || p.get("factory");
+  const rows = [...unique.values()]
+    .filter((r) => {
+      const d = dateKey(r.interviewDate);
+      if (selectedCompany && norm(r.company) !== norm(selectedCompany))
+        return false;
+      if (
+        (p.get("month") && d?.slice(0, 7) !== p.get("month")) ||
+        (p.get("from") && (!d || d < p.get("from")!)) ||
+        (p.get("to") && (!d || d > p.get("to")!))
+      )
+        return false;
+      for (const key of ["orderId", "batchId"])
+        if (p.get(key) && r.assignment?.[key] !== p.get(key)) return false;
+      for (const key of ["recruiter", "team"])
+        if (
+          p.get(key) &&
+          (r.assignment?.[key] || r.worker?.[key]) !== p.get(key)
+        )
+          return false;
+      if (
+        p.get("search") &&
+        ![r.name, r.idCard, r.workerCode].some((v) =>
+          norm(v).includes(norm(p.get("search"))),
+        )
+      )
+        return false;
+      return true;
+    })
+    .map(({ signature, key, assignment, worker, ...r }) => ({
+      ...r,
+      status: r.conflicting
+        ? "Khoản khác nhau cùng hồ sơ — chờ đối chiếu"
+        : r.warnings.length
+          ? "Cần kiểm tra số tiền"
+          : r.linked
+            ? "Đã liên kết hồ sơ"
+            : "Nguồn Excel — chưa liên kết đợt",
+      counted: !r.conflicting && !r.warnings.length,
+    }));
+  const groups = new Map<string, any>();
+  for (const r of rows) {
+    const g = groups.get(r.company) || {
+      name: r.company || "Chưa xác định công ty",
+      rows: 0,
+      paid: 0,
+      unlinked: 0,
+      pending: 0,
+    };
+    g.rows++;
+    if (r.counted) g.paid += r.paid;
+    else g.pending++;
+    if (!r.linked) g.unlinked++;
+    groups.set(r.company, g);
+  }
+  return {
+    total: rows.filter((r) => r.counted).reduce((n, r) => n + r.paid, 0),
+    rows,
+    companies: [...groups.values()],
+    unlinked: rows.filter((r) => !r.linked).length,
+    pending: rows.filter((r) => !r.counted).length,
+    skippedDuplicates,
+  };
 }
