@@ -27,7 +27,9 @@ function formatInVietnam(value: Date, includeTime: boolean) {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-    ...(includeTime ? { hour: "2-digit", minute: "2-digit", hourCycle: "h23" as const } : {}),
+    ...(includeTime
+      ? { hour: "2-digit", minute: "2-digit", hourCycle: "h23" as const }
+      : {}),
   }).formatToParts(value);
   const get = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((part) => part.type === type)?.value || "";
@@ -42,17 +44,22 @@ export function formatDate(value: unknown): string {
   if (typeof value === "number") {
     if (!Number.isFinite(value) || value < 1 || value > 2958465)
       return String(value);
-    const serialDate = new Date(Date.UTC(1899, 11, 30) + Math.floor(value) * 86400000);
+    const serialDate = new Date(
+      Date.UTC(1899, 11, 30) + Math.floor(value) * 86400000,
+    );
     return formatInVietnam(serialDate, false);
   }
 
   const text = String(value).trim();
   const parts = dateParts(text);
-  if (parts) return `${parts[0].padStart(2, "0")}/${parts[1].padStart(2, "0")}/${parts[2]}`;
+  if (parts)
+    return `${parts[0].padStart(2, "0")}/${parts[1].padStart(2, "0")}/${parts[2]}`;
   if (DATE_ONLY_ISO.test(text) || DATE_ONLY_VN.test(text)) return text;
 
   const timestamp = new Date(text);
-  return Number.isNaN(timestamp.getTime()) ? text : formatInVietnam(timestamp, false);
+  return Number.isNaN(timestamp.getTime())
+    ? text
+    : formatInVietnam(timestamp, false);
 }
 
 export function formatDateTime(value: unknown): string {
@@ -70,5 +77,7 @@ export function formatDateTime(value: unknown): string {
   if (dateParts(text)) return formatDate(text);
   if (DATE_ONLY_ISO.test(text) || DATE_ONLY_VN.test(text)) return text;
   const timestamp = new Date(text);
-  return Number.isNaN(timestamp.getTime()) ? text : formatInVietnam(timestamp, true);
+  return Number.isNaN(timestamp.getTime())
+    ? text
+    : formatInVietnam(timestamp, true);
 }

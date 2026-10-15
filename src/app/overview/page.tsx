@@ -45,8 +45,7 @@ import {
   Info,
 } from "lucide-react";
 
-const pct = (n: number | null | undefined) =>
-  n == null ? "—" : `${n}%`;
+const pct = (n: number | null | undefined) => (n == null ? "—" : `${n}%`);
 const money = (n: number) => (n || 0).toLocaleString("vi-VN") + " ₫";
 
 export default function OverviewPage() {
@@ -109,13 +108,33 @@ export default function OverviewPage() {
   // Active filters list for display
   const activeFilterList = useMemo(() => {
     const list: { key: string; label: string; value: string }[] = [];
-    if (filters.month) list.push({ key: "month", label: "Tháng PV", value: filters.month });
-    if (filters.from) list.push({ key: "from", label: "Từ ngày", value: formatDate(filters.from) });
-    if (filters.to) list.push({ key: "to", label: "Đến ngày", value: formatDate(filters.to) });
-    if (filters.interviewFactory) list.push({ key: "interviewFactory", label: "Nhà máy", value: filters.interviewFactory });
+    if (filters.month)
+      list.push({ key: "month", label: "Tháng PV", value: filters.month });
+    if (filters.from)
+      list.push({
+        key: "from",
+        label: "Từ ngày",
+        value: formatDate(filters.from),
+      });
+    if (filters.to)
+      list.push({
+        key: "to",
+        label: "Đến ngày",
+        value: formatDate(filters.to),
+      });
+    if (filters.interviewFactory)
+      list.push({
+        key: "interviewFactory",
+        label: "Nhà máy",
+        value: filters.interviewFactory,
+      });
     if (filters.orderId) {
       const o = orders.find((ord) => ord.id === filters.orderId);
-      list.push({ key: "orderId", label: "Đơn hàng", value: o ? o.name : filters.orderId });
+      list.push({
+        key: "orderId",
+        label: "Đơn hàng",
+        value: o ? o.name : filters.orderId,
+      });
     }
     if (filters.batchId) {
       list.push({ key: "batchId", label: "Đợt tuyển", value: filters.batchId });
@@ -130,7 +149,9 @@ export default function OverviewPage() {
       dataIndex: "name",
       key: "name",
       width: 180,
-      render: (text: string) => <strong className="text-slate-800">{text}</strong>,
+      render: (text: string) => (
+        <strong className="text-slate-800">{text}</strong>
+      ),
     },
     {
       title: "Lượt tuyển",
@@ -138,7 +159,9 @@ export default function OverviewPage() {
       key: "total",
       width: 100,
       sorter: (a: any, b: any) => (a.total || 0) - (b.total || 0),
-      render: (n: number) => <span className="font-semibold text-slate-900">{n || 0}</span>,
+      render: (n: number) => (
+        <span className="font-semibold text-slate-900">{n || 0}</span>
+      ),
     },
     {
       title: "Số người",
@@ -153,7 +176,9 @@ export default function OverviewPage() {
       key: "passed",
       width: 90,
       sorter: (a: any, b: any) => (a.passed || 0) - (b.passed || 0),
-      render: (n: number) => <span className="font-semibold text-emerald-600">{n || 0}</span>,
+      render: (n: number) => (
+        <span className="font-semibold text-emerald-600">{n || 0}</span>
+      ),
     },
     {
       title: "Tỷ lệ đỗ",
@@ -167,7 +192,13 @@ export default function OverviewPage() {
             percent={rate || 0}
             size="small"
             showInfo={false}
-            strokeColor={rate && rate >= 80 ? "#16a34a" : rate && rate >= 50 ? "#3b82f6" : "#f59e0b"}
+            strokeColor={
+              rate && rate >= 80
+                ? "#16a34a"
+                : rate && rate >= 50
+                  ? "#3b82f6"
+                  : "#f59e0b"
+            }
             className="w-16"
           />
           <span className="text-xs font-semibold">{pct(rate)}</span>
@@ -187,21 +218,36 @@ export default function OverviewPage() {
       dataIndex: "failed",
       key: "failed",
       width: 90,
-      render: (n: number) => (n ? <Tag color="error">{n}</Tag> : <span className="text-slate-400">0</span>),
+      render: (n: number) =>
+        n ? (
+          <Tag color="error">{n}</Tag>
+        ) : (
+          <span className="text-slate-400">0</span>
+        ),
     },
     {
       title: "Bỏ PV",
       dataIndex: "abandoned",
       key: "abandoned",
       width: 80,
-      render: (n: number) => (n ? <Tag color="warning">{n}</Tag> : <span className="text-slate-400">0</span>),
+      render: (n: number) =>
+        n ? (
+          <Tag color="warning">{n}</Tag>
+        ) : (
+          <span className="text-slate-400">0</span>
+        ),
     },
     {
       title: "Quay lại",
       dataIndex: "returning",
       key: "returning",
       width: 90,
-      render: (n: number) => (n ? <Tag color="cyan">{n}</Tag> : <span className="text-slate-400">0</span>),
+      render: (n: number) =>
+        n ? (
+          <Tag color="cyan">{n}</Tag>
+        ) : (
+          <span className="text-slate-400">0</span>
+        ),
     },
     {
       title: "Chi tiết tình trạng",
@@ -226,7 +272,9 @@ export default function OverviewPage() {
       dataIndex: "name",
       key: "name",
       width: 200,
-      render: (text: string) => <strong className="text-slate-800">{text}</strong>,
+      render: (text: string) => (
+        <strong className="text-slate-800">{text}</strong>
+      ),
     },
     {
       title: "Hồ sơ áp dụng",
@@ -234,7 +282,9 @@ export default function OverviewPage() {
       key: "applications",
       width: 110,
       sorter: (a: any, b: any) => (a.applications || 0) - (b.applications || 0),
-      render: (n: number) => <span className="font-semibold text-slate-800">{n || 0}</span>,
+      render: (n: number) => (
+        <span className="font-semibold text-slate-800">{n || 0}</span>
+      ),
     },
     {
       title: "Đủ điều kiện",
@@ -248,7 +298,9 @@ export default function OverviewPage() {
       dataIndex: "achieved",
       key: "achieved",
       width: 90,
-      render: (n: number) => <span className="font-bold text-emerald-600">{n || 0}</span>,
+      render: (n: number) => (
+        <span className="font-bold text-emerald-600">{n || 0}</span>
+      ),
     },
     {
       title: "Tỷ lệ đạt",
@@ -275,7 +327,9 @@ export default function OverviewPage() {
       key: "earned",
       width: 140,
       sorter: (a: any, b: any) => (a.earned || 0) - (b.earned || 0),
-      render: (n: number) => <span className="font-bold text-purple-700">{money(n)}</span>,
+      render: (n: number) => (
+        <span className="font-bold text-purple-700">{money(n)}</span>
+      ),
     },
     {
       title: "Thực tế đã trả",
@@ -283,7 +337,9 @@ export default function OverviewPage() {
       key: "paid",
       width: 140,
       sorter: (a: any, b: any) => (a.paid || 0) - (b.paid || 0),
-      render: (n: number) => <span className="font-bold text-emerald-700">{money(n)}</span>,
+      render: (n: number) => (
+        <span className="font-bold text-emerald-700">{money(n)}</span>
+      ),
     },
     {
       title: "Còn phải trả",
@@ -304,7 +360,9 @@ export default function OverviewPage() {
   const renderTable = (rows: any[], columns: any[]) => {
     const filteredRows = tableSearch.trim()
       ? (rows || []).filter((r) =>
-          String(r.name || "").toLowerCase().includes(tableSearch.toLowerCase())
+          String(r.name || "")
+            .toLowerCase()
+            .includes(tableSearch.toLowerCase()),
         )
       : rows || [];
 
@@ -321,7 +379,8 @@ export default function OverviewPage() {
           defaultPageSize: 10,
           showSizeChanger: true,
           pageSizeOptions: [10, 20, 50, 100],
-          showTotal: (total, range) => `${range[0]}–${range[1]} / ${total} bản ghi`,
+          showTotal: (total, range) =>
+            `${range[0]}–${range[1]} / ${total} bản ghi`,
         }}
       />
     );
@@ -333,9 +392,13 @@ export default function OverviewPage() {
 
   const totalRecruits = recSummary.total || 0;
   const passedCount = recSummary.passed || 0;
-  const passRate = recSummary.passRate ?? (totalRecruits ? Math.round((passedCount / totalRecruits) * 100) : 0);
+  const passRate =
+    recSummary.passRate ??
+    (totalRecruits ? Math.round((passedCount / totalRecruits) * 100) : 0);
   const workingCount = recSummary.working || 0;
-  const workingRate = passedCount ? Math.round((workingCount / passedCount) * 100) : 0;
+  const workingRate = passedCount
+    ? Math.round((workingCount / passedCount) * 100)
+    : 0;
   const returningCount = recSummary.returning || 0;
   const returnRate = recSummary.returnRate ?? 0;
   const failedCount = recSummary.failed || 0;
@@ -347,10 +410,17 @@ export default function OverviewPage() {
   // tổng hợp đầy đủ số tiền thực tế đã trả của cả nguồn Excel và phiếu chi nội bộ!
   const sourcePaidMoney = sourcePaid?.total || 0;
   const internalPaidMoney = rewSummary.paid || 0;
-  const paidMoney = sourcePaidMoney > 0 ? (sourcePaidMoney + internalPaidMoney) : internalPaidMoney;
+  const paidMoney =
+    sourcePaidMoney > 0
+      ? sourcePaidMoney + internalPaidMoney
+      : internalPaidMoney;
   const earnedMoney = rewSummary.earned > 0 ? rewSummary.earned : paidMoney;
-  const outstandingMoney = rewSummary.outstanding > 0 ? rewSummary.outstanding : 0;
-  const payRate = earnedMoney > 0 ? Math.min(100, Math.round((paidMoney / earnedMoney) * 100)) : 100;
+  const outstandingMoney =
+    rewSummary.outstanding > 0 ? rewSummary.outstanding : 0;
+  const payRate =
+    earnedMoney > 0
+      ? Math.min(100, Math.round((paidMoney / earnedMoney) * 100))
+      : 100;
 
   return (
     <div className="overview-page min-w-0 space-y-6 pb-12">
@@ -369,7 +439,8 @@ export default function OverviewPage() {
             Tổng Quan Tuyển Dụng & Vận Hành Lao Động
           </h1>
           <p className="text-xs md:text-sm text-slate-300 mt-1 max-w-2xl m-0">
-            Giám sát toàn diện phễu ứng viên, kết quả phỏng vấn các nhà máy và tiến độ giải ngân dòng tiền thưởng
+            Giám sát toàn diện phễu ứng viên, kết quả phỏng vấn các nhà máy và
+            tiến độ giải ngân dòng tiền thưởng
           </p>
         </div>
 
@@ -561,7 +632,7 @@ export default function OverviewPage() {
                     label: filters.orderId
                       ? `${b.periodMonth || b.name} (Chỉ tiêu: ${b.target ? b.target.toLocaleString("vi-VN") : "N/A"})`
                       : `${o.factory} · ${b.periodMonth || b.name} (Chỉ tiêu: ${b.target ? b.target.toLocaleString("vi-VN") : "N/A"})`,
-                  }))
+                  })),
                 )}
             />
           </div>
@@ -569,7 +640,9 @@ export default function OverviewPage() {
           {/* Active filter chips */}
           <div className="flex flex-wrap items-center gap-1.5">
             {activeFilterList.length === 0 ? (
-              <span className="text-xs text-slate-400 italic">Đang hiển thị toàn bộ thời gian & đơn vị</span>
+              <span className="text-xs text-slate-400 italic">
+                Đang hiển thị toàn bộ thời gian & đơn vị
+              </span>
             ) : (
               activeFilterList.map((f) => (
                 <Tag
@@ -605,7 +678,9 @@ export default function OverviewPage() {
             {/* 1. Tổng lượt tuyển */}
             <div className="p-4 rounded-xl bg-white border border-blue-100 shadow-xs hover:shadow-md transition-all">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-slate-500">Tổng Lượt Tuyển</span>
+                <span className="text-xs font-semibold text-slate-500">
+                  Tổng Lượt Tuyển
+                </span>
                 <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
                   <Users className="w-4 h-4" />
                 </div>
@@ -614,14 +689,20 @@ export default function OverviewPage() {
                 {totalRecruits.toLocaleString("vi-VN")}
               </div>
               <div className="mt-1 text-xs text-slate-500">
-                Gồm <strong className="text-slate-800">{recSummary.people || 0}</strong> người lao động
+                Gồm{" "}
+                <strong className="text-slate-800">
+                  {recSummary.people || 0}
+                </strong>{" "}
+                người lao động
               </div>
             </div>
 
             {/* 2. Đỗ Phỏng Vấn */}
             <div className="p-4 rounded-xl bg-white border border-emerald-100 shadow-xs hover:shadow-md transition-all">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-slate-500">Đỗ Phỏng Vấn (PASS)</span>
+                <span className="text-xs font-semibold text-slate-500">
+                  Đỗ Phỏng Vấn (PASS)
+                </span>
                 <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
                   <CheckCircle2 className="w-4 h-4" />
                 </div>
@@ -640,7 +721,9 @@ export default function OverviewPage() {
             {/* 3. Đang Làm Việc */}
             <div className="p-4 rounded-xl bg-white border border-indigo-100 shadow-xs hover:shadow-md transition-all">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-slate-500">Đang Làm Việc</span>
+                <span className="text-xs font-semibold text-slate-500">
+                  Đang Làm Việc
+                </span>
                 <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
                   <Briefcase className="w-4 h-4" />
                 </div>
@@ -659,23 +742,33 @@ export default function OverviewPage() {
             {/* 4. Trượt / Bỏ / Chưa rõ */}
             <div className="p-4 rounded-xl bg-white border border-amber-100 shadow-xs hover:shadow-md transition-all">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-slate-500">Trượt / Bỏ / Chưa rõ</span>
+                <span className="text-xs font-semibold text-slate-500">
+                  Trượt / Bỏ / Chưa rõ
+                </span>
                 <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
                   <AlertCircle className="w-4 h-4" />
                 </div>
               </div>
               <div className="text-2xl font-black text-amber-600 tracking-tight">
-                {(failedCount + abandonedCount + unknownInterview).toLocaleString("vi-VN")}
+                {(
+                  failedCount +
+                  abandonedCount +
+                  unknownInterview
+                ).toLocaleString("vi-VN")}
               </div>
               <div className="mt-1 text-[11px] text-slate-500">
-                Trượt: <strong>{failedCount}</strong> · Bỏ: <strong>{abandonedCount.toLocaleString("vi-VN")}</strong> · Chưa rõ: <strong>{unknownInterview}</strong>
+                Trượt: <strong>{failedCount}</strong> · Bỏ:{" "}
+                <strong>{abandonedCount.toLocaleString("vi-VN")}</strong> · Chưa
+                rõ: <strong>{unknownInterview}</strong>
               </div>
             </div>
 
             {/* 5. Lao Động Quay Lại */}
             <div className="p-4 rounded-xl bg-white border border-cyan-100 shadow-xs hover:shadow-md transition-all">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-slate-500">Lao Động Quay Lại</span>
+                <span className="text-xs font-semibold text-slate-500">
+                  Lao Động Quay Lại
+                </span>
                 <div className="w-8 h-8 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center">
                   <RotateCcw className="w-4 h-4" />
                 </div>
@@ -697,7 +790,9 @@ export default function OverviewPage() {
             {/* Tiền Đạt Mốc */}
             <div className="p-4 rounded-xl bg-white border border-purple-100 shadow-xs hover:shadow-md transition-all">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-slate-500">Tiền Đạt Mốc Thưởng</span>
+                <span className="text-xs font-semibold text-slate-500">
+                  Tiền Đạt Mốc Thưởng
+                </span>
                 <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
                   <Award className="w-4 h-4" />
                 </div>
@@ -707,9 +802,16 @@ export default function OverviewPage() {
               </div>
               <div className="mt-1 text-xs text-slate-500">
                 {rewSummary.achieved > 0 ? (
-                  <span>{rewSummary.achieved} / {rewSummary.eligible} mốc đạt tiêu chuẩn ({pct(rewSummary.achieveRate)})</span>
+                  <span>
+                    {rewSummary.achieved} / {rewSummary.eligible} mốc đạt tiêu
+                    chuẩn ({pct(rewSummary.achieveRate)})
+                  </span>
                 ) : (
-                  <span className="text-purple-600 font-medium">Hạch toán từ {sourcePaid?.rows?.length?.toLocaleString("vi-VN") || 0} lượt chi thưởng DS_THUONG</span>
+                  <span className="text-purple-600 font-medium">
+                    Hạch toán từ{" "}
+                    {sourcePaid?.rows?.length?.toLocaleString("vi-VN") || 0}{" "}
+                    lượt chi thưởng DS_THUONG
+                  </span>
                 )}
               </div>
             </div>
@@ -717,7 +819,9 @@ export default function OverviewPage() {
             {/* Thực Tế Đã Chi Trả */}
             <div className="p-4 rounded-xl bg-white border border-emerald-100 shadow-xs hover:shadow-md transition-all">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-slate-500">Thực Tế Đã Chi Trả</span>
+                <span className="text-xs font-semibold text-slate-500">
+                  Thực Tế Đã Chi Trả
+                </span>
                 <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
                   <Coins className="w-4 h-4" />
                 </div>
@@ -730,7 +834,9 @@ export default function OverviewPage() {
                   {payRate}% Đã giải ngân
                 </Tag>
                 {sourcePaidMoney > 0 && (
-                  <span className="text-emerald-700 font-medium">(Đồng bộ file DS_THUONG)</span>
+                  <span className="text-emerald-700 font-medium">
+                    (Đồng bộ file DS_THUONG)
+                  </span>
                 )}
               </div>
             </div>
@@ -738,7 +844,9 @@ export default function OverviewPage() {
             {/* Còn Phải Trả */}
             <div className="p-4 rounded-xl bg-white border border-amber-100 shadow-xs hover:shadow-md transition-all">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-slate-500">Dư Nợ Còn Phải Trả</span>
+                <span className="text-xs font-semibold text-slate-500">
+                  Dư Nợ Còn Phải Trả
+                </span>
                 <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
                   <Clock className="w-4 h-4" />
                 </div>
@@ -748,7 +856,9 @@ export default function OverviewPage() {
               </div>
               <div className="mt-1 text-xs text-slate-500">
                 {outstandingMoney > 0 ? (
-                  <span className="text-amber-600 font-medium">Cần chuẩn bị kế hoạch thanh toán</span>
+                  <span className="text-amber-600 font-medium">
+                    Cần chuẩn bị kế hoạch thanh toán
+                  </span>
                 ) : (
                   <span className="text-slate-400">Không có dư nợ quá hạn</span>
                 )}
@@ -759,129 +869,176 @@ export default function OverviewPage() {
       )}
 
       {/* 4. ĐỐI CHIẾU NGUỒN EXCEL (CHỈ HIỂN THỊ KHI CÓ DỮ LIỆU NGUỒN) */}
-      {sourcePaid && (sourcePaid.total > 0 || (sourcePaid.rows || []).length > 0) && (
-        <Card
-          title={
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-1">
-              <div className="flex items-center gap-2">
-                <Coins className="w-5 h-5 text-amber-600" />
-                <div>
-                  <span className="font-bold text-base text-slate-800">
-                    Đối Chiếu Chi Thưởng Thực Tế Theo File DS_THUONG Gốc
-                  </span>
-                  <span className="text-xs text-slate-500 block font-normal">
-                    Số liệu giải ngân các lần thưởng 1 → 7 nạp trực tiếp từ bảng tính của công ty
-                  </span>
+      {sourcePaid &&
+        (sourcePaid.total > 0 || (sourcePaid.rows || []).length > 0) && (
+          <Card
+            title={
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-1">
+                <div className="flex items-center gap-2">
+                  <Coins className="w-5 h-5 text-amber-600" />
+                  <div>
+                    <span className="font-bold text-base text-slate-800">
+                      Đối Chiếu Chi Thưởng Thực Tế Theo File DS_THUONG Gốc
+                    </span>
+                    <span className="text-xs text-slate-500 block font-normal">
+                      Số liệu giải ngân các lần thưởng 1 → 7 nạp trực tiếp từ
+                      bảng tính của công ty
+                    </span>
+                  </div>
                 </div>
+                <Tag
+                  color="cyan"
+                  className="text-sm font-bold px-3 py-1 rounded-lg"
+                >
+                  Tổng tiền đã chi: {money(sourcePaid.total)}
+                </Tag>
               </div>
-              <Tag color="cyan" className="text-sm font-bold px-3 py-1 rounded-lg">
-                Tổng tiền đã chi: {money(sourcePaid.total)}
-              </Tag>
+            }
+            className="border-slate-200 shadow-xs rounded-2xl"
+          >
+            {/* Hộp giải thích rõ ràng, thân thiện cho người dùng */}
+            <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3.5 mb-4 text-xs space-y-1.5">
+              <div className="font-bold text-blue-900 flex items-center gap-1.5 text-sm">
+                <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                Toàn bộ số tiền thưởng {money(sourcePaid.total)} đã được ghi
+                nhận và đồng bộ vào hệ thống
+              </div>
+              <p className="text-slate-600 m-0 leading-relaxed">
+                • <b>Số lượt nhận thưởng</b>: Tổng số dòng chi thưởng tương ứng
+                với các lao động nhận thưởng tại từng nhà máy.
+                <br />•{" "}
+                <b>
+                  Chưa khớp ngày PV/Mã NV (
+                  {sourcePaid.unlinked?.toLocaleString("vi-VN") || 0} lượt)
+                </b>
+                : Tiền thưởng{" "}
+                <b>đã được hạch toán đầy đủ vào tổng tiền đã trả</b>. Trạng thái
+                này chỉ báo hiệu trên file thưởng ngày PV hoặc mã NV có độ lệch
+                nhỏ so với ngày đăng ký ban đầu trong file <code>DS_TONG</code>,
+                hoàn toàn không làm mất hay sai lệch tiền thưởng.
+              </p>
             </div>
-          }
-          className="border-slate-200 shadow-xs rounded-2xl"
-        >
-          {/* Hộp giải thích rõ ràng, thân thiện cho người dùng */}
-          <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3.5 mb-4 text-xs space-y-1.5">
-            <div className="font-bold text-blue-900 flex items-center gap-1.5 text-sm">
-              <CheckCircle2 className="w-4 h-4 text-blue-600" />
-              Toàn bộ số tiền thưởng {money(sourcePaid.total)} đã được ghi nhận và đồng bộ vào hệ thống
-            </div>
-            <p className="text-slate-600 m-0 leading-relaxed">
-              • <b>Số lượt nhận thưởng</b>: Tổng số dòng chi thưởng tương ứng với các lao động nhận thưởng tại từng nhà máy.
-              <br />
-              • <b>Chưa khớp ngày PV/Mã NV ({sourcePaid.unlinked?.toLocaleString("vi-VN") || 0} lượt)</b>: Tiền thưởng <b>đã được hạch toán đầy đủ vào tổng tiền đã trả</b>. Trạng thái này chỉ báo hiệu trên file thưởng ngày PV hoặc mã NV có độ lệch nhỏ so với ngày đăng ký ban đầu trong file <code>DS_TONG</code>, hoàn toàn không làm mất hay sai lệch tiền thưởng.
-            </p>
-          </div>
 
-          <Tabs
-            items={[
-              {
-                key: "sourceCompanies",
-                label: `Tổng Hợp Theo Nhà Máy (${sourcePaid.companies?.length || 0} công ty)`,
-                children: renderTable(sourcePaid.companies, [
-                  {
-                    title: "Công ty / Nhà máy",
-                    dataIndex: "name",
-                    key: "name",
-                    render: (t: string) => <strong className="text-slate-800">{t}</strong>,
-                  },
-                  {
-                    title: "Số lượt nhận thưởng",
-                    dataIndex: "rows",
-                    key: "rows",
-                    render: (n: number) => <span className="font-semibold text-slate-800">{n.toLocaleString("vi-VN")} lượt</span>,
-                  },
-                  {
-                    title: "Thực tế đã chi trả",
-                    dataIndex: "paid",
-                    key: "paid",
-                    render: (n: number) => <strong className="text-emerald-700">{money(n)}</strong>,
-                  },
-                  {
-                    title: "Khớp hồ sơ DS_TONG",
-                    key: "matched",
-                    render: (_: any, r: any) => {
-                      const matched = (r.rows || 0) - (r.unlinked || 0);
-                      return (
-                        <Tooltip title="Khớp chính xác cả CCCD, nhà máy và ngày PV với hồ sơ DS_TONG">
-                          <Tag color={matched > 0 ? "green" : "default"}>
-                            {matched.toLocaleString("vi-VN")} lượt khớp
+            <Tabs
+              items={[
+                {
+                  key: "sourceCompanies",
+                  label: `Tổng Hợp Theo Nhà Máy (${sourcePaid.companies?.length || 0} công ty)`,
+                  children: renderTable(sourcePaid.companies, [
+                    {
+                      title: "Công ty / Nhà máy",
+                      dataIndex: "name",
+                      key: "name",
+                      render: (t: string) => (
+                        <strong className="text-slate-800">{t}</strong>
+                      ),
+                    },
+                    {
+                      title: "Số lượt nhận thưởng",
+                      dataIndex: "rows",
+                      key: "rows",
+                      render: (n: number) => (
+                        <span className="font-semibold text-slate-800">
+                          {n.toLocaleString("vi-VN")} lượt
+                        </span>
+                      ),
+                    },
+                    {
+                      title: "Thực tế đã chi trả",
+                      dataIndex: "paid",
+                      key: "paid",
+                      render: (n: number) => (
+                        <strong className="text-emerald-700">{money(n)}</strong>
+                      ),
+                    },
+                    {
+                      title: "Khớp hồ sơ DS_TONG",
+                      key: "matched",
+                      render: (_: any, r: any) => {
+                        const matched = (r.rows || 0) - (r.unlinked || 0);
+                        return (
+                          <Tooltip title="Khớp chính xác cả CCCD, nhà máy và ngày PV với hồ sơ DS_TONG">
+                            <Tag color={matched > 0 ? "green" : "default"}>
+                              {matched.toLocaleString("vi-VN")} lượt khớp
+                            </Tag>
+                          </Tooltip>
+                        );
+                      },
+                    },
+                    {
+                      title: "Chưa khớp ngày PV / Mã NV",
+                      dataIndex: "unlinked",
+                      key: "unlinked",
+                      render: (n: number) => (
+                        <Tooltip title="Tiền thưởng đã được tính đầy đủ vào tổng tiền, nhưng ngày PV hoặc mã NV trong file thưởng lệch một chút so với hồ sơ DS_TONG">
+                          <Tag color={n > 0 ? "orange" : "default"}>
+                            {n.toLocaleString("vi-VN")} chưa khớp ngày
                           </Tag>
                         </Tooltip>
-                      );
+                      ),
                     },
-                  },
-                  {
-                    title: "Chưa khớp ngày PV / Mã NV",
-                    dataIndex: "unlinked",
-                    key: "unlinked",
-                    render: (n: number) => (
-                      <Tooltip title="Tiền thưởng đã được tính đầy đủ vào tổng tiền, nhưng ngày PV hoặc mã NV trong file thưởng lệch một chút so với hồ sơ DS_TONG">
-                        <Tag color={n > 0 ? "orange" : "default"}>
-                          {n.toLocaleString("vi-VN")} chưa khớp ngày
+                    {
+                      title: "Cần kiểm tra số tiền",
+                      dataIndex: "pending",
+                      key: "pending",
+                      render: (n: number) =>
+                        n > 0 ? (
+                          <Tag color="error">{n} dòng</Tag>
+                        ) : (
+                          <Tag color="cyan">Hợp lệ 100%</Tag>
+                        ),
+                    },
+                  ]),
+                },
+                {
+                  key: "sourceRows",
+                  label: `Danh Sách Chi Tiết Từng Lượt Nhận Thưởng (${sourcePaid.rows?.length || 0})`,
+                  children: renderTable(sourcePaid.rows, [
+                    { title: "Người lao động", dataIndex: "name", key: "name" },
+                    { title: "Số CCCD", dataIndex: "idCard", key: "idCard" },
+                    { title: "Công ty", dataIndex: "company", key: "company" },
+                    { title: "Tháng thưởng", dataIndex: "month", key: "month" },
+                    {
+                      title: "Đã chi trả",
+                      dataIndex: "paid",
+                      key: "paid",
+                      render: money,
+                    },
+                    {
+                      title: "Ngày PV ghi nhận",
+                      dataIndex: "interviewDate",
+                      key: "interviewDate",
+                    },
+                    {
+                      title: "Chính sách thưởng",
+                      dataIndex: "policy",
+                      key: "policy",
+                    },
+                    {
+                      title: "Trạng thái khớp hồ sơ",
+                      dataIndex: "status",
+                      key: "status",
+                      render: (st: string) => (
+                        <Tag
+                          color={
+                            st.includes("Đã liên kết") ? "green" : "orange"
+                          }
+                        >
+                          {st}
                         </Tag>
-                      </Tooltip>
-                    ),
-                  },
-                  {
-                    title: "Cần kiểm tra số tiền",
-                    dataIndex: "pending",
-                    key: "pending",
-                    render: (n: number) => (
-                      n > 0 ? <Tag color="error">{n} dòng</Tag> : <Tag color="cyan">Hợp lệ 100%</Tag>
-                    ),
-                  },
-                ]),
-              },
-              {
-                key: "sourceRows",
-                label: `Danh Sách Chi Tiết Từng Lượt Nhận Thưởng (${sourcePaid.rows?.length || 0})`,
-                children: renderTable(sourcePaid.rows, [
-                  { title: "Người lao động", dataIndex: "name", key: "name" },
-                  { title: "Số CCCD", dataIndex: "idCard", key: "idCard" },
-                  { title: "Công ty", dataIndex: "company", key: "company" },
-                  { title: "Tháng thưởng", dataIndex: "month", key: "month" },
-                  { title: "Đã chi trả", dataIndex: "paid", key: "paid", render: money },
-                  { title: "Ngày PV ghi nhận", dataIndex: "interviewDate", key: "interviewDate" },
-                  { title: "Chính sách thưởng", dataIndex: "policy", key: "policy" },
-                  {
-                    title: "Trạng thái khớp hồ sơ",
-                    dataIndex: "status",
-                    key: "status",
-                    render: (st: string) => (
-                      <Tag color={st.includes("Đã liên kết") ? "green" : "orange"}>
-                        {st}
-                      </Tag>
-                    ),
-                  },
-                  { title: "Chi tiết các lần thưởng 1 → 7", dataIndex: "sourceRewards", key: "sourceRewards" },
-                ]),
-              },
-            ]}
-          />
-        </Card>
-      )}
+                      ),
+                    },
+                    {
+                      title: "Chi tiết các lần thưởng 1 → 7",
+                      dataIndex: "sourceRewards",
+                      key: "sourceRewards",
+                    },
+                  ]),
+                },
+              ]}
+            />
+          </Card>
+        )}
 
       {/* 5. PHỄU & ĐỒ THỊ TRỰC QUAN HÓA (VISUAL ANALYTICS) */}
       {data && <OverviewCharts data={data} />}
@@ -897,7 +1054,8 @@ export default function OverviewPage() {
                   Bảng Dữ Liệu Vĩ Mô & Khám Phá Chi Tiết
                 </span>
                 <p className="text-xs font-normal text-slate-500 m-0">
-                  Xem toàn bộ các cột thông số, tỷ lệ đỗ, làm việc, chỉ tiêu đơn hàng và tiến độ thưởng
+                  Xem toàn bộ các cột thông số, tỷ lệ đỗ, làm việc, chỉ tiêu đơn
+                  hàng và tiến độ thưởng
                 </p>
               </div>
 
@@ -927,14 +1085,18 @@ export default function OverviewPage() {
                     Theo Nhà Máy PV ({data.recruitment.factories?.length || 0})
                   </span>
                 ),
-                children: renderTable(data.recruitment.factories, recruitColumns),
+                children: renderTable(
+                  data.recruitment.factories,
+                  recruitColumns,
+                ),
               },
               {
                 key: "orders",
                 label: (
                   <span className="flex items-center gap-1.5 font-medium">
                     <Target className="w-4 h-4 text-indigo-600" />
-                    Theo Đơn Hàng & Chỉ Tiêu ({data.recruitment.orders?.length || 0})
+                    Theo Đơn Hàng & Chỉ Tiêu (
+                    {data.recruitment.orders?.length || 0})
                   </span>
                 ),
                 children: renderTable(data.recruitment.orders, [
@@ -946,7 +1108,9 @@ export default function OverviewPage() {
                     render: (t: string, r: any) => (
                       <div>
                         <strong className="text-slate-800 block">{t}</strong>
-                        <span className="text-xs text-slate-500">{r.factory || "—"}</span>
+                        <span className="text-xs text-slate-500">
+                          {r.factory || "—"}
+                        </span>
                       </div>
                     ),
                   },
@@ -957,7 +1121,9 @@ export default function OverviewPage() {
                     width: 130,
                     render: (t: number | null) => (
                       <span className="font-semibold text-slate-700">
-                        {t != null ? `${t.toLocaleString("vi-VN")} người` : "Chưa đặt"}
+                        {t != null
+                          ? `${t.toLocaleString("vi-VN")} người`
+                          : "Chưa đặt"}
                       </span>
                     ),
                   },
@@ -966,7 +1132,8 @@ export default function OverviewPage() {
                     dataIndex: "targetPassRate",
                     key: "targetPassRate",
                     width: 140,
-                    sorter: (a: any, b: any) => (a.targetPassRate || 0) - (b.targetPassRate || 0),
+                    sorter: (a: any, b: any) =>
+                      (a.targetPassRate || 0) - (b.targetPassRate || 0),
                     render: (rate: number | null) =>
                       rate != null ? (
                         <div className="flex items-center gap-2">
@@ -1004,7 +1171,10 @@ export default function OverviewPage() {
                     Theo Tình Trạng ({data.recruitment.statuses?.length || 0})
                   </span>
                 ),
-                children: renderTable(data.recruitment.statuses, recruitColumns),
+                children: renderTable(
+                  data.recruitment.statuses,
+                  recruitColumns,
+                ),
               },
               {
                 key: "recruiters",
@@ -1014,7 +1184,10 @@ export default function OverviewPage() {
                     Theo Chuyên Viên Tuyển
                   </span>
                 ),
-                children: renderTable(data.recruitment.recruiters, recruitColumns),
+                children: renderTable(
+                  data.recruitment.recruiters,
+                  recruitColumns,
+                ),
               },
               {
                 key: "teams",
@@ -1042,7 +1215,8 @@ export default function OverviewPage() {
                         key: "bCompanies",
                         label: `Theo Công Ty / Nhà Máy (${(data.rewards.companies || sourcePaid?.companies)?.length || 0})`,
                         children: renderTable(
-                          (data.rewards.companies && data.rewards.companies.length > 0)
+                          data.rewards.companies &&
+                            data.rewards.companies.length > 0
                             ? data.rewards.companies
                             : (sourcePaid?.companies || []).map((c: any) => ({
                                 name: c.name,
@@ -1054,23 +1228,32 @@ export default function OverviewPage() {
                                 paid: c.paid,
                                 outstanding: 0,
                               })),
-                          rewardColumns
+                          rewardColumns,
                         ),
                       },
                       {
                         key: "bMonths",
                         label: "Theo Tháng Thưởng",
-                        children: renderTable(data.rewards.months, rewardColumns),
+                        children: renderTable(
+                          data.rewards.months,
+                          rewardColumns,
+                        ),
                       },
                       {
                         key: "bPolicies",
                         label: "Theo Chính Sách Thưởng",
-                        children: renderTable(data.rewards.policies, rewardColumns),
+                        children: renderTable(
+                          data.rewards.policies,
+                          rewardColumns,
+                        ),
                       },
                       {
                         key: "bMilestones",
                         label: "Theo Mốc Công Đạt",
-                        children: renderTable(data.rewards.milestones, rewardColumns),
+                        children: renderTable(
+                          data.rewards.milestones,
+                          rewardColumns,
+                        ),
                       },
                     ]}
                   />
