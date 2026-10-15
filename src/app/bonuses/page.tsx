@@ -1,5 +1,6 @@
 "use client";
 import { useIdentity } from "@/components/AuthGate";
+import { formatDate } from "@/lib/date-format";
 import React, { useEffect, useState } from "react";
 import {
   Table,
@@ -206,7 +207,12 @@ export default function BonusesPage() {
       width: 130,
       render: (v: string, r: any) => sourceInfo(r)?.monthOriginal || v,
     },
-    { title: "Ngày PV", dataIndex: "interviewDate", width: 130 },
+    {
+      title: "Ngày PV",
+      dataIndex: "interviewDate",
+      width: 130,
+      render: (value: string) => formatDate(value),
+    },
     { title: "Chính sách", dataIndex: "policy", width: 280 },
     { title: "Mã nhân viên", dataIndex: "workerCode", width: 150 },
     {

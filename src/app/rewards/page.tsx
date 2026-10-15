@@ -17,6 +17,8 @@ import {
   Tag,
 } from "antd";
 import { useIdentity } from "@/components/AuthGate";
+import DateField from "@/components/DateField";
+import { formatDate } from "@/lib/date-format";
 export default function RewardsPage() {
   const user = useIdentity(),
     canWrite = user?.permissions.includes("bonus:write"),
@@ -165,11 +167,11 @@ export default function RewardsPage() {
           }
         >
           <p className="mb-3 text-slate-500">
-            Ngày PV {e.assignment.interviewDate} · Ngày đỗ{" "}
-            {e.assignment.passedDate} ·{" "}
+            Ngày PV {formatDate(e.assignment.interviewDate)} · Ngày đỗ{" "}
+            {formatDate(e.assignment.passedDate)} ·{" "}
             {e.assignment.order?.name || "Chưa gán đơn hàng"} /{" "}
             {e.assignment.batch?.name || "Chưa gán đợt"} · hiệu lực{" "}
-            {e.effectiveFrom} → {e.effectiveTo}
+            {formatDate(e.effectiveFrom)} → {formatDate(e.effectiveTo)}
           </p>
           <Table<any>
             rowKey="id"
@@ -247,7 +249,11 @@ export default function RewardsPage() {
                   pagination={false}
                   dataSource={s.payments}
                   columns={[
-                    { title: "Ngày trả", dataIndex: "paidOn" },
+                    {
+                      title: "Ngày trả",
+                      dataIndex: "paidOn",
+                      render: (value: string) => formatDate(value),
+                    },
                     { title: "Tiền", dataIndex: "amount" },
                     { title: "Chứng từ", dataIndex: "reference" },
                     { title: "Người xác nhận", dataIndex: "confirmedBy" },
@@ -284,7 +290,7 @@ export default function RewardsPage() {
               options={workers.flatMap((w) =>
                 w.assignments.map((a: any) => ({
                   value: a.id,
-                  label: `${w.fullName} · ${a.interviewFactory} · PV ${a.interviewDate || "—"} · ${a.employeeCode || ""}`,
+                  label: `${w.fullName} · ${a.interviewFactory} · PV ${formatDate(a.interviewDate)} · ${a.employeeCode || ""}`,
                 })),
               )}
             />
@@ -299,7 +305,7 @@ export default function RewardsPage() {
                 .filter((p) => p.isActive)
                 .map((p) => ({
                   value: p.id,
-                  label: `${p.factory} · ${p.name} (${p.effectiveFrom || "?"} → ${p.effectiveTo || "?"})`,
+                  label: `${p.factory} · ${p.name} (${p.effectiveFrom ? formatDate(p.effectiveFrom) : "?"} → ${p.effectiveTo ? formatDate(p.effectiveTo) : "?"})`,
                 }))}
             />
           </Form.Item>
@@ -319,13 +325,13 @@ export default function RewardsPage() {
             <Checkbox>Đã xác nhận đủ điều kiện xét mốc</Checkbox>
           </Form.Item>
           <Form.Item name="eligibleAsOf" label="Ngày xét điều kiện">
-            <Input type="date" />
+            <DateField />
           </Form.Item>
           <Form.Item name="achieved" valuePropName="checked">
             <Checkbox>Đạt mốc thưởng</Checkbox>
           </Form.Item>
           <Form.Item name="achievedOn" label="Ngày đạt mốc">
-            <Input type="date" />
+            <DateField />
           </Form.Item>
           <Form.Item name="note" label="Căn cứ / ghi chú">
             <Input.TextArea />
@@ -350,7 +356,7 @@ export default function RewardsPage() {
             label="Ngày trả"
             rules={[{ required: true }]}
           >
-            <Input type="date" />
+            <DateField />
           </Form.Item>
           <Form.Item
             name="reference"

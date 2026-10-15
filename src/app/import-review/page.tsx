@@ -16,6 +16,7 @@ import {
   Popconfirm,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { formatDate } from '@/lib/date-format';
 import {
   AlertCircle,
   AlertTriangle,
@@ -88,8 +89,8 @@ function explainIssue(rawMessage: string, values: Record<string, any> = {}): Iss
       category: 'Lệch đợt tuyển dụng',
       color: 'orange',
       badge: 'Lệch hồ sơ',
-      title: `Lệch hồ sơ: File ghi "${factory || 'Chưa rõ nhà máy'}" (Ngày PV: ${interviewDate || 'Trống'})`,
-      detail: `File Thưởng ghi nhà máy "${factory}", ngày PV "${interviewDate}". Tuy nhiên trong danh sách tuyển dụng gốc (DS_TONG) không có đợt tuyển tương ứng hoặc ghi nhà máy làm việc khác (VD: Nam Sơn thay vì Goertek).`,
+      title: `Lệch hồ sơ: File ghi "${factory || 'Chưa rõ nhà máy'}" (Ngày PV: ${interviewDate ? formatDate(interviewDate) : 'Trống'})`,
+      detail: `File Thưởng ghi nhà máy "${factory}", ngày PV "${interviewDate ? formatDate(interviewDate) : ''}". Tuy nhiên trong danh sách tuyển dụng gốc (DS_TONG) không có đợt tuyển tương ứng hoặc ghi nhà máy làm việc khác (VD: Nam Sơn thay vì Goertek).`,
       solution: 'Kiểm tra công nhân có đổi nhà máy làm việc thực tế hoặc cập nhật ngày PV trong DS_TONG.',
     };
   }
@@ -433,7 +434,7 @@ export default function ImportReviewPage() {
               {factory}
             </div>
             <div className="text-[11px] text-slate-500">
-              {interviewDate ? `PV: ${interviewDate}` : ''}
+              {interviewDate ? `PV: ${formatDate(interviewDate)}` : ''}
               {interviewDate && month ? ' • ' : ''}
               {month ? `${month}` : ''}
             </div>
@@ -764,7 +765,7 @@ export default function ImportReviewPage() {
                         pagination={false}
                         dataSource={Object.entries(r.values || {}).map(([column, value]) => ({
                           column,
-                          value: String(value ?? ''),
+                          value: value ?? '',
                         }))}
                         columns={[
                           {
@@ -776,9 +777,9 @@ export default function ImportReviewPage() {
                           {
                             title: 'Giá trị ghi nhận từ file',
                             dataIndex: 'value',
-                            render: (v) => (
+                            render: (v, record) => (
                               <span className={v ? 'text-slate-900 font-medium text-xs' : 'text-slate-400 italic text-xs'}>
-                                {v || '(Trống)'}
+                                {v ? (/ngày|date/i.test(String(record.column)) ? formatDate(v) : v) : '(Trống)'}
                               </span>
                             ),
                           },

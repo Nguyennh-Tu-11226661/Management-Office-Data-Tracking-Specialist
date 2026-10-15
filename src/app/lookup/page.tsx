@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { formatDate } from "@/lib/date-format";
 import { Card, Input, Button, Form, message, Tag, Table, Divider } from "antd";
 import {
   Search,
@@ -246,7 +247,7 @@ export default function LookupPage() {
                           Ngày PV / Bắt đầu làm việc
                         </span>
                         <div className="font-bold text-slate-800 text-sm mt-1">
-                          {comp.startDate || comp.interviewDate || "—"}
+                          {formatDate(comp.startDate || comp.interviewDate)}
                         </div>
                       </div>
 
@@ -263,7 +264,7 @@ export default function LookupPage() {
                           className={`text-sm mt-1 font-bold ${hasLeft ? "text-rose-700" : "text-slate-800"}`}
                         >
                           {comp.leaveDate
-                            ? comp.leaveDate
+                            ? formatDate(comp.leaveDate)
                             : isWorking
                               ? "Đang làm việc"
                               : "—"}
@@ -321,7 +322,7 @@ export default function LookupPage() {
                                   </span>
                                   {p.paidOn && (
                                     <span className="text-slate-500 ml-2">
-                                      · Ngày chi trả: {p.paidOn}
+                                      · Ngày chi trả: {formatDate(p.paidOn)}
                                     </span>
                                   )}
                                   {p.reference && (

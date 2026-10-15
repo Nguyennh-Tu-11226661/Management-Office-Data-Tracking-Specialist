@@ -17,6 +17,8 @@ import {
 } from "antd";
 import { useIdentity } from "@/components/AuthGate";
 import AssignmentFields from "@/components/AssignmentFields";
+import DateField from "@/components/DateField";
+import { formatDate } from "@/lib/date-format";
 
 export default function WorkerDetailPage() {
   const { id } = useParams<{ id: string }>(),
@@ -107,7 +109,7 @@ export default function WorkerDetailPage() {
           items={Object.entries({
             CCCD: worker.idCard,
             "Mã hồ sơ": worker.code || "—",
-            "Ngày sinh": worker.dob || "—",
+            "Ngày sinh": formatDate(worker.dob),
             "Giới tính": worker.gender || "—",
             SĐT: worker.phone || "—",
             "Quê quán/Tỉnh": worker.province || "Chưa xác định",
@@ -174,7 +176,7 @@ export default function WorkerDetailPage() {
                 {
                   key: "pv",
                   label: "Ngày PV",
-                  children: a.interviewDate || "—",
+                  children: formatDate(a.interviewDate),
                 },
                 {
                   key: "result",
@@ -192,17 +194,17 @@ export default function WorkerDetailPage() {
                 {
                   key: "passed",
                   label: "Ngày đỗ",
-                  children: a.passedDate || "—",
+                  children: formatDate(a.passedDate),
                 },
                 {
                   key: "start",
                   label: "Ngày bắt đầu làm",
-                  children: a.startDate || "—",
+                  children: formatDate(a.startDate),
                 },
                 {
                   key: "left",
                   label: "Ngày nghỉ",
-                  children: a.leaveDate || "—",
+                  children: formatDate(a.leaveDate),
                 },
                 {
                   key: "reason",
@@ -248,7 +250,7 @@ export default function WorkerDetailPage() {
                   children:
                     a.confirmedWorkDays == null
                       ? "Chưa chốt"
-                      : `${a.confirmedWorkDays} công, chốt ${a.workDaysAsOf} (${a.workDaysConfirmedBy})`,
+                      : `${a.confirmedWorkDays} công, chốt ${formatDate(a.workDaysAsOf)} (${a.workDaysConfirmedBy})`,
                 },
               ]}
             />
@@ -257,7 +259,7 @@ export default function WorkerDetailPage() {
             {a.events.length ? (
               <Timeline
                 items={a.events.map((e: any) => ({
-                  children: `${e.occurredOn}: ${e.fromStatus ? e.fromStatus + " → " : ""}${e.toStatus} · ${e.operator}${e.note ? " · " + e.note : ""}`,
+                  children: `${formatDate(e.occurredOn)}: ${e.fromStatus ? e.fromStatus + " → " : ""}${e.toStatus} · ${e.operator}${e.note ? " · " + e.note : ""}`,
                 }))}
               />
             ) : (
@@ -269,8 +271,8 @@ export default function WorkerDetailPage() {
             {a.enrollments.map((e: any) => (
               <div key={e.id} className="mt-4">
                 <h3 className="font-semibold text-sm">
-                  {e.factory} · {e.policyName} ({e.effectiveFrom} →{" "}
-                  {e.effectiveTo})
+                  {e.factory} · {e.policyName} ({formatDate(e.effectiveFrom)} →{" "}
+                  {formatDate(e.effectiveTo)})
                 </h3>
                 <Table<any>
                   rowKey="id"
@@ -311,7 +313,11 @@ export default function WorkerDetailPage() {
                         pagination={false}
                         dataSource={s.payments}
                         columns={[
-                          { title: "Ngày trả", dataIndex: "paidOn" },
+                          {
+                            title: "Ngày trả",
+                            dataIndex: "paidOn",
+                            render: (value: string) => formatDate(value),
+                          },
                           {
                             title: "Tiền",
                             dataIndex: "amount",
@@ -372,7 +378,11 @@ export default function WorkerDetailPage() {
               leaveReason: "Lý do nghỉ",
             }).map(([name, label]) => (
               <Form.Item key={name} name={name} label={label}>
-                <Input />
+                {["dob", "interviewDate", "leaveDate"].includes(name) ? (
+                  <DateField />
+                ) : (
+                  <Input />
+                )}
               </Form.Item>
             ))}
           </div>
@@ -388,7 +398,7 @@ export default function WorkerDetailPage() {
             name="eventDate"
             label="Ngày cập nhật trạng thái (để trống = hôm nay)"
           >
-            <Input type="date" />
+            <DateField />
           </Form.Item>
           <Form.Item name="eventNote" label="Ghi chú / căn cứ chốt công">
             <Input.TextArea />

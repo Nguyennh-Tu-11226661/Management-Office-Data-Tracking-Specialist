@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Form, Input, Select, InputNumber } from "antd";
+import DateField from "@/components/DateField";
+import { formatDate } from "@/lib/date-format";
 export default function AssignmentFields({
   form,
   showWorkDays = false,
@@ -58,7 +60,7 @@ export default function AssignmentFields({
           disabled={!orderId}
           options={(order?.batches || []).map((b: any) => ({
             value: b.id,
-            label: `${b.code} · ${b.name} (${b.startDate} → ${b.endDate})`,
+            label: `${b.code} · ${b.name} (${formatDate(b.startDate)} → ${formatDate(b.endDate)})`,
           }))}
         />
       </Form.Item>
@@ -107,10 +109,10 @@ export default function AssignmentFields({
         label="Ngày phỏng vấn đỗ"
         rules={result === "PASS" ? [{ required: true }] : []}
       >
-        <Input type="date" />
+        <DateField />
       </Form.Item>
       <Form.Item name="startDate" label="Ngày bắt đầu làm (sau ngày đỗ)">
-        <Input type="date" />
+        <DateField />
       </Form.Item>
       {showWorkDays && (
         <>
@@ -121,7 +123,7 @@ export default function AssignmentFields({
             <InputNumber min={0} max={10000} step={0.5} className="w-full" />
           </Form.Item>
           <Form.Item name="workDaysAsOf" label="Ngày chốt số công">
-            <Input type="date" />
+            <DateField />
           </Form.Item>
         </>
       )}

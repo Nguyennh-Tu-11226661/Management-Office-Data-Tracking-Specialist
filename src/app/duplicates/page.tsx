@@ -26,6 +26,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import type { ColumnsType } from "antd/es/table";
+import { formatDate } from "@/lib/date-format";
 
 interface DuplicateAlert {
   id: string;
@@ -254,7 +255,7 @@ export default function DuplicatesPage() {
           <div className="font-semibold text-slate-800">{r.newFactory}</div>
           <div className="text-[11px] text-slate-500">
             {r.newInterviewDate && r.newInterviewDate !== "—"
-              ? `Ngày PV: ${r.newInterviewDate}`
+              ? `Ngày PV: ${formatDate(r.newInterviewDate)}`
               : ""}
             {r.newStatus && r.newStatus !== "—" ? ` (${r.newStatus})` : ""}
           </div>

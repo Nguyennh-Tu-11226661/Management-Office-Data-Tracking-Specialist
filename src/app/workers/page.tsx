@@ -1,5 +1,7 @@
 "use client";
 import AssignmentFields from "@/components/AssignmentFields";
+import DateField from "@/components/DateField";
+import { formatDate } from "@/lib/date-format";
 import { STATUSES } from "@/lib/worker-validation";
 import { useIdentity } from "@/components/AuthGate";
 import React, { useEffect, useState } from "react";
@@ -46,6 +48,14 @@ const FACTORIES = [
   "LG",
   "Bảo vệ",
 ];
+const DATE_FIELDS = new Set([
+  "dob",
+  "idCardDate",
+  "interviewDate",
+  "expectedTrainingDate",
+  "standardTrainingDate",
+  "leaveDate",
+]);
 
 export default function WorkersPage() {
   const user = useIdentity();
@@ -501,7 +511,9 @@ export default function WorkersPage() {
       render: (_: any, record: any) => {
         const val = record.sourceValues?.["Ngày NH"];
         return val ? (
-          <span className="text-rose-600 font-medium text-xs">{val}</span>
+          <span className="text-rose-600 font-medium text-xs">
+            {formatDate(val)}
+          </span>
         ) : (
           <span className="text-slate-400">—</span>
         );
@@ -532,7 +544,7 @@ export default function WorkersPage() {
       key: "Ngày sinh",
       width: 100,
       render: (_: any, record: any) =>
-        record.sourceValues?.["Ngày sinh"] || "—",
+        formatDate(record.sourceValues?.["Ngày sinh"]),
     },
     {
       title: "Giới tính",
@@ -546,7 +558,8 @@ export default function WorkersPage() {
       title: "Ngày cấp",
       key: "Ngày cấp",
       width: 100,
-      render: (_: any, record: any) => record.sourceValues?.["Ngày cấp"] || "—",
+      render: (_: any, record: any) =>
+        formatDate(record.sourceValues?.["Ngày cấp"]),
     },
     {
       title: "Địa chỉ",
@@ -586,14 +599,15 @@ export default function WorkersPage() {
       title: "Ngày PV",
       key: "Ngày PV",
       width: 100,
-      render: (_: any, record: any) => record.sourceValues?.["Ngày PV"] || "—",
+      render: (_: any, record: any) =>
+        formatDate(record.sourceValues?.["Ngày PV"]),
     },
     {
       title: "Ngày Đào tạo dự kiến",
       key: "Ngày Đào tạo dự kiến",
       width: 120,
       render: (_: any, record: any) =>
-        record.sourceValues?.["Ngày Đào tạo dự kiến"] || "—",
+        formatDate(record.sourceValues?.["Ngày Đào tạo dự kiến"]),
     },
     {
       title: "Tình trạng đào tạo",
@@ -607,7 +621,7 @@ export default function WorkersPage() {
       key: "Ngày đào tạo chuẩn",
       width: 120,
       render: (_: any, record: any) =>
-        record.sourceValues?.["Ngày đào tạo chuẩn"] || "—",
+        formatDate(record.sourceValues?.["Ngày đào tạo chuẩn"]),
     },
     {
       title: "Tháng nhận việc",
@@ -1068,9 +1082,10 @@ export default function WorkersPage() {
                   </span>
                 </Descriptions.Item>
                 <Descriptions.Item label="Ngày sinh">
-                  {detailRecord.sourceValues?.["Ngày sinh"] ||
-                    detailRecord.dob ||
-                    "—"}
+                  {formatDate(
+                    detailRecord.sourceValues?.["Ngày sinh"] ||
+                      detailRecord.dob,
+                  )}
                 </Descriptions.Item>
                 <Descriptions.Item label="Giới tính">
                   {detailRecord.sourceValues?.["Giới tính"] ||
@@ -1078,9 +1093,10 @@ export default function WorkersPage() {
                     "—"}
                 </Descriptions.Item>
                 <Descriptions.Item label="Ngày cấp CCCD">
-                  {detailRecord.sourceValues?.["Ngày cấp"] ||
-                    detailRecord.idCardDate ||
-                    "—"}
+                  {formatDate(
+                    detailRecord.sourceValues?.["Ngày cấp"] ||
+                      detailRecord.idCardDate,
+                  )}
                 </Descriptions.Item>
                 <Descriptions.Item label="Địa chỉ / Quê quán" span={2}>
                   {detailRecord.sourceValues?.["Địa chỉ"] ||
@@ -1100,7 +1116,7 @@ export default function WorkersPage() {
                   {detailRecord.sourceValues?.["Nhà máy PV"] || "—"}
                 </Descriptions.Item>
                 <Descriptions.Item label="Ngày phỏng vấn">
-                  {detailRecord.sourceValues?.["Ngày PV"] || "—"}
+                  {formatDate(detailRecord.sourceValues?.["Ngày PV"])}
                 </Descriptions.Item>
                 <Descriptions.Item label="Chuyên viên tuyển dụng">
                   {detailRecord.sourceValues?.["Tuyển dụng"] || "—"}
@@ -1112,10 +1128,14 @@ export default function WorkersPage() {
                   {detailRecord.sourceValues?.["Tình trạng đào tạo"] || "—"}
                 </Descriptions.Item>
                 <Descriptions.Item label="Ngày ĐT dự kiến">
-                  {detailRecord.sourceValues?.["Ngày Đào tạo dự kiến"] || "—"}
+                  {formatDate(
+                    detailRecord.sourceValues?.["Ngày Đào tạo dự kiến"],
+                  )}
                 </Descriptions.Item>
                 <Descriptions.Item label="Ngày ĐT chuẩn" span={2}>
-                  {detailRecord.sourceValues?.["Ngày đào tạo chuẩn"] || "—"}
+                  {formatDate(
+                    detailRecord.sourceValues?.["Ngày đào tạo chuẩn"],
+                  )}
                 </Descriptions.Item>
               </Descriptions>
             </div>
@@ -1150,7 +1170,7 @@ export default function WorkersPage() {
                 </Descriptions.Item>
                 <Descriptions.Item label="Ngày nghỉ việc (Ngày NH)">
                   <span className="text-rose-600 font-medium">
-                    {detailRecord.sourceValues?.["Ngày NH"] || "—"}
+                    {formatDate(detailRecord.sourceValues?.["Ngày NH"])}
                   </span>
                 </Descriptions.Item>
                 <Descriptions.Item label="Lý do nghỉ việc" span={2}>
@@ -1181,6 +1201,7 @@ export default function WorkersPage() {
                       title: "Ngày PV",
                       dataIndex: ["values", "Ngày PV"],
                       key: "pv",
+                      render: (value: string) => formatDate(value),
                     },
                     {
                       title: "Chính sách",
@@ -1329,12 +1350,14 @@ export default function WorkersPage() {
                     <div>
                       PV/Bắt đầu:{" "}
                       <strong className="text-slate-700">
-                        {a.startDate || a.passedDate || a.interviewDate || "—"}
+                        {formatDate(
+                          a.startDate || a.passedDate || a.interviewDate,
+                        )}
                       </strong>
                     </div>
                     {a.leaveDate && (
                       <div className="text-rose-600 font-medium">
-                        Nghỉ: {a.leaveDate}
+                        Nghỉ: {formatDate(a.leaveDate)}
                       </div>
                     )}
                   </div>
@@ -1461,7 +1484,7 @@ export default function WorkersPage() {
             </Form.Item>
 
             <Form.Item name="dob" label="Ngày Sinh">
-              <Input placeholder="15/04/1998" />
+              <DateField />
             </Form.Item>
 
             <Form.Item name="gender" label="Giới Tính">
@@ -1498,7 +1521,7 @@ export default function WorkersPage() {
             </Form.Item>
 
             <Form.Item name="standardTrainingDate" label="Ngày Đào Tạo Chuẩn">
-              <Input type="date" placeholder="10/01/2026" />
+              <DateField />
             </Form.Item>
 
             <Form.Item name="onboardingMonth" label="Tháng Nhận Việc">
@@ -1542,7 +1565,7 @@ export default function WorkersPage() {
                   )[name]
                 }
               >
-                <Input />
+                {DATE_FIELDS.has(name) ? <DateField /> : <Input />}
               </Form.Item>
             ))}
           </div>
@@ -1596,7 +1619,7 @@ export default function WorkersPage() {
               onboardingMonth: "Tháng nhận việc",
             }).map(([name, label]) => (
               <Form.Item key={name} name={name} label={label}>
-                <Input />
+                {DATE_FIELDS.has(name) ? <DateField /> : <Input />}
               </Form.Item>
             ))}
           </div>
@@ -1626,7 +1649,7 @@ export default function WorkersPage() {
                     ]}
                     extra="Ghi nhận ngày làm việc cuối cùng tại xưởng"
                   >
-                    <Input placeholder="VD: 25/01/2026" />
+                    <DateField />
                   </Form.Item>
 
                   <Form.Item

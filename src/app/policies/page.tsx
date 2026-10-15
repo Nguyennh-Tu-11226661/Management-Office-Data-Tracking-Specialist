@@ -15,6 +15,8 @@ import {
   message,
 } from "antd";
 import { useIdentity } from "@/components/AuthGate";
+import DateField from "@/components/DateField";
+import { formatDate } from "@/lib/date-format";
 export default function PoliciesPage() {
   const user = useIdentity(),
     canWrite = user?.permissions.includes("bonus:write");
@@ -122,7 +124,7 @@ export default function PoliciesPage() {
           {
             title: "Hiệu lực",
             render: (_, r) =>
-              `${r.effectiveFrom || "Chưa đặt"} → ${r.effectiveTo || "Chưa đặt"}`,
+              `${r.effectiveFrom ? formatDate(r.effectiveFrom) : "Chưa đặt"} → ${r.effectiveTo ? formatDate(r.effectiveTo) : "Chưa đặt"}`,
           },
           {
             title: "Trạng thái",
@@ -227,14 +229,14 @@ export default function PoliciesPage() {
               label="Ngày PV từ"
               rules={[{ required: true }]}
             >
-              <Input type="date" />
+              <DateField />
             </Form.Item>
             <Form.Item
               name="effectiveTo"
               label="Ngày PV đến"
               rules={[{ required: true }]}
             >
-              <Input type="date" />
+              <DateField />
             </Form.Item>
           </div>
           <Form.Item name="description" label="Ghi chú">

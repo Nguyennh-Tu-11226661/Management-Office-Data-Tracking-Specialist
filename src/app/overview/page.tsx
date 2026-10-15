@@ -18,6 +18,8 @@ import {
 } from "antd";
 import OverviewCharts from "@/components/OverviewCharts";
 import { useIdentity } from "@/components/AuthGate";
+import DateField from "@/components/DateField";
+import { formatDate } from "@/lib/date-format";
 import Link from "next/link";
 import {
   Calendar,
@@ -108,8 +110,8 @@ export default function OverviewPage() {
   const activeFilterList = useMemo(() => {
     const list: { key: string; label: string; value: string }[] = [];
     if (filters.month) list.push({ key: "month", label: "Tháng PV", value: filters.month });
-    if (filters.from) list.push({ key: "from", label: "Từ ngày", value: filters.from });
-    if (filters.to) list.push({ key: "to", label: "Đến ngày", value: filters.to });
+    if (filters.from) list.push({ key: "from", label: "Từ ngày", value: formatDate(filters.from) });
+    if (filters.to) list.push({ key: "to", label: "Đến ngày", value: formatDate(filters.to) });
     if (filters.interviewFactory) list.push({ key: "interviewFactory", label: "Nhà máy", value: filters.interviewFactory });
     if (filters.orderId) {
       const o = orders.find((ord) => ord.id === filters.orderId);
@@ -470,11 +472,10 @@ export default function OverviewPage() {
             >
               Từ ngày PV
             </label>
-            <Input
+            <DateField
               id="filter-from"
-              type="date"
               value={filters.from || ""}
-              onChange={(e) => set("from", e.target.value)}
+              onChange={(value) => set("from", value)}
               className="w-full rounded-lg"
             />
           </div>
@@ -487,11 +488,10 @@ export default function OverviewPage() {
             >
               Đến ngày PV
             </label>
-            <Input
+            <DateField
               id="filter-to"
-              type="date"
               value={filters.to || ""}
-              onChange={(e) => set("to", e.target.value)}
+              onChange={(value) => set("to", value)}
               className="w-full rounded-lg"
             />
           </div>

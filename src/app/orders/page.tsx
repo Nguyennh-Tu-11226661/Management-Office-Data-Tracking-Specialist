@@ -16,6 +16,8 @@ import {
   Space,
 } from "antd";
 import { useIdentity } from "@/components/AuthGate";
+import DateField from "@/components/DateField";
+import { formatDate } from "@/lib/date-format";
 
 export default function OrdersPage() {
   const user = useIdentity();
@@ -219,8 +221,16 @@ export default function OrdersPage() {
                 { title: "Mã đợt", dataIndex: "code" },
                 { title: "Tên đợt", dataIndex: "name" },
                 { title: "Kỳ tuyển", dataIndex: "periodMonth" },
-                { title: "Từ ngày", dataIndex: "startDate" },
-                { title: "Đến ngày", dataIndex: "endDate" },
+                {
+                  title: "Từ ngày",
+                  dataIndex: "startDate",
+                  render: (value: string) => formatDate(value),
+                },
+                {
+                  title: "Đến ngày",
+                  dataIndex: "endDate",
+                  render: (value: string) => formatDate(value),
+                },
                 { title: "Chỉ tiêu", dataIndex: "target" },
                 {
                   title: "Thao tác",
@@ -312,14 +322,14 @@ export default function OrdersPage() {
                   label="Bắt đầu"
                   rules={[{ required: true }]}
                 >
-                  <Input type="date" />
+                  <DateField />
                 </Form.Item>
                 <Form.Item
                   name="endDate"
                   label="Kết thúc"
                   rules={[{ required: true }]}
                 >
-                  <Input type="date" />
+                  <DateField />
                 </Form.Item>
               </div>
               <Form.Item name="target" label="Chỉ tiêu số người">

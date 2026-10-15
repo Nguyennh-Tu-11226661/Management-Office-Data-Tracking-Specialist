@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Card, Table, Select, Input, Button, message } from "antd";
+import { formatDateTime } from "@/lib/date-format";
 export default function AuditPage() {
   const [rows, setRows] = useState<any[]>([]),
     [total, setTotal] = useState(0),
@@ -60,7 +61,7 @@ export default function AuditPage() {
           {
             title: "Thời gian",
             dataIndex: "createdAt",
-            render: (v) => new Date(v).toLocaleString("vi-VN"),
+            render: (v) => formatDateTime(v),
           },
           { title: "Người thao tác", dataIndex: "operator" },
           { title: "Phân hệ", dataIndex: "module" },
