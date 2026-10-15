@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client-js"
-  output = "../.generated/client"
+  output   = "../.generated/client"
 }
 
 datasource db {
@@ -29,261 +29,273 @@ model Worker {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  archivedAt DateTime?
-  archivedBy String?
-  assignments     WorkAssignment[]
-  bonusRecords    BonusRecord[]
-  bankAccounts    BankAccount[]
+  archivedAt   DateTime?
+  archivedBy   String?
+  assignments  WorkAssignment[]
+  bonusRecords BonusRecord[]
+  bankAccounts BankAccount[]
 }
 
 model WorkAssignment {
-  id                     String    @id @default(cuid())
+  id                     String            @id @default(cuid())
   workerId               String
-  worker                 Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  interviewFactory       String    // Nhà máy PV (Luxshare QC, Canon, Goertek, Fushan, Amphenol, Foxconn, Luxshare VT, LG...)
-  workingFactory         String?   // Nhà máy làm việc
-  contractType           String?   // Loại HD
-  status                 String    @default("Đang chờ phỏng vấn") // Tình trạng: "Đang làm việc", "Đã nghỉ việc", ...
-  leaveDate              String?   // Ngày NH (Ngày Nghỉ việc)
-  leaveReason            String?   // Lý do nghỉ
-  shuttleBusKtx          String?   // Đón xe - KTX
-  interviewDate          String?   // Ngày PV
-  expectedTrainingDate   String?   // Ngày Đào tạo dự kiến
-  expectedTrainingStatus String?   // Tình trạng Đào tạo dự kiến
-  standardTrainingDate   String?   // Ngày đào tạo chuẩn
-  onboardingMonth        String?   // Tháng nhận việc (T01.2026...)
-  recruiter              String?   // Tuyển dụng
-  source                 String?   // Nguồn
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  worker                 Worker            @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  interviewFactory       String            // Nhà máy PV
+  workingFactory         String?           // Nhà máy làm việc
+  contractType           String?           // Loại HD
+  status                 String            @default("Đang chờ phỏng vấn")
+  leaveDate              String?           // Ngày NH (Ngày Nghỉ việc)
+  leaveReason            String?           // Lý do nghỉ
+  shuttleBusKtx          String?           // Đón xe - KTX
+  interviewDate          String?           // Ngày PV
+  expectedTrainingDate   String?           // Ngày Đào tạo dự kiến
+  expectedTrainingStatus String?           // Tình trạng Đào tạo dự kiến
+  standardTrainingDate   String?           // Ngày đào tạo chuẩn
+  onboardingMonth        String?           // Tháng nhận việc
+  recruiter              String?           // Tuyển dụng
+  source                 String?           // Nguồn
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
 
-  bonusRecords           BonusRecord[]
-  orderId                String?
-  order                  RecruitmentOrder? @relation(fields: [orderId], references: [id])
-  batchId                String?
-  batch                  RecruitmentBatch? @relation(fields: [batchId], references: [id])
-  team                   String?
-  recruiterId            String?
-  recruiterPerson        Recruiter? @relation(fields:[recruiterId],references:[id])
-  teamId                 String?
-  teamEntry              RecruitmentTeam? @relation(fields:[teamId],references:[id])
-  employeeCode           String?
-  interviewResult        String @default("UNKNOWN")
-  passedDate             String?
-  startDate              String?
-  confirmedWorkDays      Float?
-  workDaysAsOf           String?
-  workDaysConfirmedBy    String?
-  events                 AssignmentEvent[]
-  enrollments            PolicyEnrollment[]
+  bonusRecords         BonusRecord[]
+  orderId              String?
+  order                RecruitmentOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  batchId              String?
+  batch                RecruitmentBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  team                 String?
+  recruiterId          String?
+  recruiterPerson      Recruiter?        @relation(fields: [recruiterId], references: [id], onDelete: SetNull)
+  teamId               String?
+  teamEntry            RecruitmentTeam?  @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  employeeCode         String?
+  interviewResult      String            @default("UNKNOWN")
+  passedDate           String?
+  startDate            String?
+  confirmedWorkDays    Float?
+  workDaysAsOf         String?
+  workDaysConfirmedBy  String?
+  events               AssignmentEvent[]
+  enrollments          PolicyEnrollment[]
 }
 
 model BonusRecord {
-  id              String          @id @default(cuid())
-  workerId        String
-  worker          Worker          @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  assignmentId    String?
-  assignment      WorkAssignment? @relation(fields: [assignmentId], references: [id])
-  company         String?         // Công ty
-  month           String          // Tháng (T01.2026, T02.2026...)
-  interviewDate   String?         // Ngày PV
-  policy          String?         // Chính sách
-  workerCode      String?         // Mã nhân viên
-  bonus1          Float?          @default(0) // Thưởng lần 1
-  bonus2          Float?          @default(0) // Thưởng lần 2
-  bonus3          Float?          @default(0) // Thưởng lần 3
-  bonus4          Float?          @default(0) // Thưởng lần 4
-  bonus5          Float?          @default(0) // Thưởng lần 5
-  bonus6          Float?          @default(0) // Thưởng lần 6
-  bonus7          Float?          @default(0) // Thưởng lần 7
-  totalBonus      Float?          @default(0) // Tổng thưởng
-  status          String          @default("DRAFT") // DRAFT, REVIEWED, APPROVED, LOCKED
-  note            String?
-  approvedBy      String?
-  approvedAt      DateTime?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id            String          @id @default(cuid())
+  workerId      String
+  worker        Worker          @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  assignmentId  String?
+  assignment    WorkAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  company       String?         // Công ty
+  month         String          // Tháng
+  interviewDate String?         // Ngày PV
+  policy        String?         // Chính sách
+  workerCode    String?         // Mã nhân viên
+  bonus1        Float?          @default(0)
+  bonus2        Float?          @default(0)
+  bonus3        Float?          @default(0)
+  bonus4        Float?          @default(0)
+  bonus5        Float?          @default(0)
+  bonus6        Float?          @default(0)
+  bonus7        Float?          @default(0)
+  totalBonus    Float?          @default(0)
+  status        String          @default("DRAFT")
+  note          String?
+  approvedBy    String?
+  approvedAt    DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 }
 
 model BankAccount {
-  id                    String    @id @default(cuid())
-  workerId              String
-  worker                Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  bankName              String    // Ngân hàng
-  bankCode              String?   // Mã ngân hàng (VCB, TCB, MB...)
-  accountNumber         String    // STK
-  accountHolderName     String    // Họ tên chủ tài khoản
-  isNameVerified        Boolean   @default(false) // Trùng khớp tên CCCD
-  isAuthorized          Boolean   @default(false) // Ủy quyền / mượn tài khoản
-  authorizedRelation    String?   // Mối quan hệ ủy quyền
-  verificationStatus    String    @default("UNVERIFIED") // VALID, MISMATCH, AUTHORIZED, UNVERIFIED
-  warningMessage        String?   // Cảnh báo sai STK / Lệch tên
-  checkedBy             String?   // Người check
-  checkResult           String?   // Kết Quả
-  checkedAt             DateTime?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  workerId           String
+  worker             Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  bankName           String    // Ngân hàng
+  bankCode           String?   // Mã ngân hàng
+  accountNumber      String    // STK
+  accountHolderName  String    // Họ tên chủ tài khoản
+  isNameVerified     Boolean   @default(false)
+  isAuthorized       Boolean   @default(false)
+  authorizedRelation String?   
+  verificationStatus String    @default("UNVERIFIED")
+  warningMessage     String?   
+  checkedBy          String?   
+  checkResult        String?   
+  checkedAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 }
 
 model BonusPolicy {
-  id          String   @id @default(cuid())
-  name        String   // Tên chính sách (VD: Chính sách mùa vụ Luxshare 2026)
-  factory     String   // Nhà máy áp dụng
-  description String?
+  id            String             @id @default(cuid())
+  name          String             // Tên chính sách
+  factory       String             // Nhà máy áp dụng
+  description   String?
   effectiveFrom String?
   effectiveTo   String?
   orderId       String?
-  order         RecruitmentOrder? @relation(fields: [orderId], references: [id])
+  order         RecruitmentOrder?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
   enrollments   PolicyEnrollment[]
-  rulesJson   String   // Chi tiết JSON: [{step: 1, milestone: "3 công", amount: 300000}, ...]
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  rulesJson     String             
+  isActive      Boolean            @default(true)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 }
 
 model AuditLog {
   id        String   @id @default(cuid())
-  action    String   // CREATE, UPDATE, DELETE, APPROVE, EXPORT
-  module    String   // WORKER, BONUS, BANK, SYSTEM
+  action    String   
+  module    String   
   details   String?
   operator  String?  @default("Hệ thống")
   createdAt DateTime @default(now())
 }
 
 model RecruitmentOrder {
-  id String @id @default(cuid())
-  code String @unique
-  name String
-  factory String
-  isActive Boolean @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  batches RecruitmentBatch[]
-  assignments WorkAssignment[]
-  policies BonusPolicy[]
-  factoryId String?
-  factoryEntry Factory? @relation(fields:[factoryId],references:[id])
+  id           String             @id @default(cuid())
+  code         String             @unique
+  name         String
+  factory      String
+  isActive     Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  batches      RecruitmentBatch[]
+  assignments  WorkAssignment[]
+  policies     BonusPolicy[]
+  factoryId    String?
+  factoryEntry Factory?           @relation(fields: [factoryId], references: [id], onDelete: SetNull)
 }
+
 model RecruitmentBatch {
-  id String @id @default(cuid())
-  orderId String
-  order RecruitmentOrder @relation(fields:[orderId],references:[id])
-  code String
-  name String
-  startDate String
-  endDate String
+  id          String           @id @default(cuid())
+  orderId     String
+  order       RecruitmentOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  code        String
+  name        String
+  startDate   String
+  endDate     String
   periodMonth String?
-  target Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  target      Int?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
   assignments WorkAssignment[]
-  @@unique([orderId,code])
+
+  @@unique([orderId, code])
 }
+
 model AssignmentEvent {
-  id String @id @default(cuid())
-  assignmentId String
-  assignment WorkAssignment @relation(fields:[assignmentId],references:[id])
-  occurredOn String
-  fromStatus String?
-  toStatus String
+  id              String         @id @default(cuid())
+  assignmentId    String
+  assignment      WorkAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  occurredOn      String
+  fromStatus      String?
+  toStatus        String
   interviewResult String?
-  note String?
-  operator String
-  createdAt DateTime @default(now())
+  note            String?
+  operator        String
+  createdAt       DateTime       @default(now())
 }
+
 model PolicyEnrollment {
-  id String @id @default(cuid())
-  assignmentId String
-  assignment WorkAssignment @relation(fields:[assignmentId],references:[id])
-  policyId String
-  policy BonusPolicy @relation(fields:[policyId],references:[id])
-  policyName String
-  factory String
+  id            String         @id @default(cuid())
+  assignmentId  String
+  assignment    WorkAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  policyId      String
+  policy        BonusPolicy    @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  policyName    String
+  factory       String
   effectiveFrom String
-  effectiveTo String
+  effectiveTo   String
   rulesSnapshot String
-  createdBy String
-  createdAt DateTime @default(now())
-  stages RewardStage[]
-  @@unique([assignmentId,policyId])
+  createdBy     String
+  createdAt     DateTime       @default(now())
+  stages        RewardStage[]
+
+  @@unique([assignmentId, policyId])
 }
+
 model RewardStage {
-  id String @id @default(cuid())
-  enrollmentId String
-  enrollment PolicyEnrollment @relation(fields:[enrollmentId],references:[id])
-  step Int
-  label String
-  thresholdDays Float?
-  amount Int
-  eligible Boolean @default(false)
-  eligibleAsOf String?
-  achieved Boolean @default(false)
-  achievedOn String?
-  confirmedBy String?
+  id               String           @id @default(cuid())
+  enrollmentId     String
+  enrollment       PolicyEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  step             Int
+  label            String
+  thresholdDays    Float?
+  amount           Int
+  eligible         Boolean          @default(false)
+  eligibleAsOf     String?
+  achieved         Boolean          @default(false)
+  achievedOn       String?
+  confirmedBy      String?
   confirmationNote String?
-  updatedAt DateTime @updatedAt
-  payments RewardPayment[]
-  @@unique([enrollmentId,step])
+  updatedAt        DateTime         @updatedAt
+  payments         RewardPayment[]
+
+  @@unique([enrollmentId, step])
 }
+
 model RewardPayment {
-  id String @id @default(cuid())
-  stageId String
-  stage RewardStage @relation(fields:[stageId],references:[id])
-  amount Int
-  paidOn String
-  reference String @unique
-  note String?
+  id          String      @id @default(cuid())
+  stageId     String
+  stage       RewardStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  amount      Int
+  paidOn      String
+  reference   String      @unique
+  note        String?
   confirmedBy String
-  createdAt DateTime @default(now())
+  createdAt   DateTime    @default(now())
 }
 
 model Factory {
- id String @id @default(cuid())
- code String @unique
- name String @unique
- isActive Boolean @default(true)
- createdAt DateTime @default(now())
- updatedAt DateTime @updatedAt
- orders RecruitmentOrder[]
+  id        String             @id @default(cuid())
+  code      String             @unique
+  name      String             @unique
+  isActive  Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  orders    RecruitmentOrder[]
 }
+
 model RecruitmentTeam {
- id String @id @default(cuid())
- code String @unique
- name String
- isActive Boolean @default(true)
- createdAt DateTime @default(now())
- updatedAt DateTime @updatedAt
- recruiters Recruiter[]
- assignments WorkAssignment[]
+  id          String           @id @default(cuid())
+  code        String           @unique
+  name        String
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  recruiters  Recruiter[]
+  assignments WorkAssignment[]
 }
+
 model Recruiter {
- id String @id @default(cuid())
- code String @unique
- name String
- teamId String?
- team RecruitmentTeam? @relation(fields:[teamId],references:[id])
- isActive Boolean @default(true)
- createdAt DateTime @default(now())
- updatedAt DateTime @updatedAt
- assignments WorkAssignment[]
+  id          String           @id @default(cuid())
+  code        String           @unique
+  name        String
+  teamId      String?
+  team        RecruitmentTeam? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  assignments WorkAssignment[]
 }
+
 model LaborStatus {
- id String @id @default(cuid())
- name String @unique
- category String
- warnsDuplicate Boolean @default(false)
- endsAssignment Boolean @default(false)
- isActive Boolean @default(true)
- updatedAt DateTime @updatedAt
+  id             String   @id @default(cuid())
+  name           String   @unique
+  category       String
+  warnsDuplicate Boolean  @default(false)
+  endsAssignment Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  updatedAt      DateTime @updatedAt
 }
+
 model ImportProfile {
- id String @id @default(cuid())
- name String @unique
- sheetName String @default("DS_TONG")
- mappingJson String
- sourceUrl String?
- syncDirection String @default("IMPORT_ONLY")
- isActive Boolean @default(true)
- createdAt DateTime @default(now())
- updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String   @unique
+  sheetName     String   @default("DS_TONG")
+  mappingJson   String
+  sourceUrl     String?
+  syncDirection String   @default("IMPORT_ONLY")
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
