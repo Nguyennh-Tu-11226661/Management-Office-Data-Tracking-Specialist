@@ -19,6 +19,7 @@ import {
   Tooltip,
   Alert,
   Popconfirm,
+  DatePicker,
 } from "antd";
 import {
   UserPlus,
@@ -51,7 +52,7 @@ export default function WorkersPage() {
   const canWrite = user?.permissions.includes("worker:write");
   const [archived, setArchived] = useState(false);
   const [month, setMonth] = useState("");
-  const [sourceMonth, setSourceMonth] = useState("");
+  const [sourceMonth, setSourceMonth] = useState<string[]>([]);
   const [activeConfirm, setActiveConfirm] = useState(false);
   const [rehire, setRehire] = useState(false);
   const [historyWorker, setHistoryWorker] = useState<any>(null);
@@ -59,14 +60,15 @@ export default function WorkersPage() {
   const [workers, setWorkers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [factoryFilter, setFactoryFilter] = useState("");
+  const [factoryFilter, setFactoryFilter] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [recruiterFilter, setRecruiterFilter] = useState<string[]>([]);
+  const [dateRange, setDateRange] = useState<any>(null); // State mới lưu [Từ ngày, Đến ngày]
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [statusFilter, setStatusFilter] = useState("");
   const [sourceOptions, setSourceOptions] = useState<Record<string, string[]>>(
     {},
   );
-  const [recruiterFilter, setRecruiterFilter] = useState("");
   const [warningsOnly, setWarningsOnly] = useState(false);
   const [pendingDuplicateCount, setPendingDuplicateCount] = useState(0);
   const [systemWarningCount, setSystemWarningCount] = useState(0);
@@ -92,16 +94,42 @@ export default function WorkersPage() {
   const fetchWorkers = async () => {
     try {
       setLoading(true);
+
       const params = new URLSearchParams({
         archived: String(archived),
         month,
-        sourceMonth,
-        recruiter: recruiterFilter,
+        // Chuyển mảng thành chuỗi phân tách bằng dấu phẩy
+        sourceMonth: Array.isArray(sourceMonth)
+          ? sourceMonth.join(",")
+          : sourceMonth || "",
+        recruiter: Array.isArray(recruiterFilter)
+          ? recruiterFilter.join(",")
+          : recruiterFilter || "",
         ...(warningsOnly ? { warningsOnly: "true" } : {}),
       });
+
       if (search) params.append("search", search);
-      if (factoryFilter) params.append("factory", factoryFilter);
-      if (statusFilter) params.append("status", statusFilter);
+
+      // Thêm các tham số lọc Multi-select
+      if (Array.isArray(factoryFilter) && factoryFilter.length > 0) {
+        params.append("factory", factoryFilter.join(","));
+      } else if (typeof factoryFilter === "string" && factoryFilter) {
+        params.append("factory", factoryFilter);
+      }
+
+      if (Array.isArray(statusFilter) && statusFilter.length > 0) {
+        params.append("status", statusFilter.join(","));
+      } else if (typeof statusFilter === "string" && statusFilter) {
+        params.append("status", statusFilter);
+      }
+
+      // Thêm lọc khoảng thời gian Từ ngày - Đến ngày (Date Range)
+      if (dateRange && dateRange[0]) {
+        params.append("fromDate", dateRange[0].format("YYYY-MM-DD"));
+      }
+      if (dateRange && dateRange[1]) {
+        params.append("toDate", dateRange[1].format("YYYY-MM-DD"));
+      }
 
       const res = await fetch(`/api/worker-source-rows?${params.toString()}`);
       const json = await res.json();
@@ -143,11 +171,12 @@ export default function WorkersPage() {
 
   const handleResetFilters = () => {
     setSearch("");
-    setFactoryFilter("");
-    setStatusFilter("");
-    setSourceMonth("");
+    setFactoryFilter([]);
+    setStatusFilter([]);
+    setSourceMonth([]);
     setMonth("");
-    setRecruiterFilter("");
+    setRecruiterFilter([]);
+    setDateRange(null);
     setWarningsOnly(false);
     setCurrentPage(1);
   };
@@ -264,11 +293,11 @@ export default function WorkersPage() {
   };
 
   // Xóa hồ sơ người lao động
-const handleDeleteWorker = async (record: any) => {
+  const handleDeleteWorker = async (record: any) => {
     if (!record) return;
     try {
       const targetId = record.workerId || record.id;
-      const res = await fetch('/api/workers', {
+      const res = await fetch("/api/workers", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -684,8 +713,9 @@ const handleDeleteWorker = async (record: any) => {
       {/* Filter Card */}
       <Card className="shadow-sm border-slate-200">
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-            <div>
+          {/* Hàng 1: Ô tìm kiếm & Chọn khoảng thời gian Từ ngày - Đến ngày */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+            <div className="lg:col-span-2">
               <label className="block text-xs font-semibold text-slate-600 mb-1">
                 Tìm kiếm
               </label>
@@ -698,71 +728,162 @@ const handleDeleteWorker = async (record: any) => {
                 allowClear
               />
             </div>
-            <div>
+
+            {/* Mới: Bộ lọc khoảng ngày (Từ ngày - Đến ngày) */}
+            <div className="lg:col-span-4">
               <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Nhà máy phỏng vấn
+                Khoảng thời gian (Từ ngày - Đến ngày)
               </label>
-              <Select
+              <DatePicker.RangePicker
                 className="w-full"
-                allowClear
-                placeholder="Tất cả nhà máy"
-                value={factoryFilter || undefined}
-                onChange={(v) => setFactoryFilter(v || "")}
-                options={(sourceOptions["Nhà máy PV"] || []).map((value) => ({
-                  value,
-                  label: value,
-                }))}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Tình trạng
-              </label>
-              <Select
-                className="w-full"
-                allowClear
-                placeholder="Tất cả tình trạng"
-                value={statusFilter || undefined}
-                onChange={(v) => setStatusFilter(v || "")}
-                options={(sourceOptions["Tình trạng"] || []).map((value) => ({
-                  value,
-                  label: value,
-                }))}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Tháng nhận việc
-              </label>
-              <Select
-                className="w-full"
-                allowClear
-                placeholder="Tất cả tháng nhận việc"
-                value={sourceMonth || undefined}
-                onChange={(v) => setSourceMonth(v || "")}
-                options={(sourceOptions["Tháng nhận việc"] || []).map(
-                  (value) => ({ value, label: value }),
-                )}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Người tuyển dụng
-              </label>
-              <Select
-                className="w-full"
-                allowClear
-                placeholder="Tất cả tuyển dụng"
-                value={recruiterFilter || undefined}
-                onChange={(v) => setRecruiterFilter(v || "")}
-                options={(sourceOptions["Tuyển dụng"] || []).map((value) => ({
-                  value,
-                  label: value,
-                }))}
+                format="DD/MM/YYYY"
+                placeholder={["Từ ngày", "Đến ngày"]}
+                value={dateRange} // Khai báo state: const [dateRange, setDateRange] = useState(null);
+                onChange={(dates) => setDateRange(dates)}
               />
             </div>
           </div>
 
+          {/* Hàng 2: Bộ lọc Multi-Select (Chọn nhiều) cho Nhà máy, Tình trạng, Tháng, Tuyển dụng */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* 1. Nhà máy phỏng vấn */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Nhà máy phỏng vấn (Chọn nhiều)
+              </label>
+              <Select
+                mode="multiple"
+                maxTagCount="responsive"
+                className="w-full"
+                allowClear
+                placeholder="Tất cả nhà máy"
+                value={factoryFilter || []}
+                onChange={(selectedValues) => {
+                  const allList = sourceOptions["Nhà máy PV"] || [];
+                  if (selectedValues.includes("ALL")) {
+                    if ((factoryFilter || []).length === allList.length) {
+                      setFactoryFilter([]);
+                    } else {
+                      setFactoryFilter(allList);
+                    }
+                  } else {
+                    setFactoryFilter(selectedValues);
+                  }
+                }}
+                options={[
+                  { value: "ALL", label: "--- Chọn tất cả ---" },
+                  ...(sourceOptions["Nhà máy PV"] || []).map((value) => ({
+                    value,
+                    label: value,
+                  })),
+                ]}
+              />
+            </div>
+
+            {/* 2. Tình trạng */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Tình trạng (Chọn nhiều)
+              </label>
+              <Select
+                mode="multiple"
+                maxTagCount="responsive"
+                className="w-full"
+                allowClear
+                placeholder="Tất cả tình trạng"
+                value={statusFilter || []}
+                onChange={(selectedValues) => {
+                  const allList = sourceOptions["Tình trạng"] || [];
+                  if (selectedValues.includes("ALL")) {
+                    if ((statusFilter || []).length === allList.length) {
+                      setStatusFilter([]);
+                    } else {
+                      setStatusFilter(allList);
+                    }
+                  } else {
+                    setStatusFilter(selectedValues);
+                  }
+                }}
+                options={[
+                  { value: "ALL", label: "--- Chọn tất cả ---" },
+                  ...(sourceOptions["Tình trạng"] || []).map((value) => ({
+                    value,
+                    label: value,
+                  })),
+                ]}
+              />
+            </div>
+
+            {/* 3. Tháng nhận việc */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Tháng nhận việc (Chọn nhiều)
+              </label>
+              <Select
+                mode="multiple"
+                maxTagCount="responsive"
+                className="w-full"
+                allowClear
+                placeholder="Tất cả tháng nhận việc"
+                value={sourceMonth || []}
+                onChange={(selectedValues) => {
+                  const allList = sourceOptions["Tháng nhận việc"] || [];
+                  if (selectedValues.includes("ALL")) {
+                    if ((sourceMonth || []).length === allList.length) {
+                      setSourceMonth([]);
+                    } else {
+                      setSourceMonth(allList);
+                    }
+                  } else {
+                    setSourceMonth(selectedValues);
+                  }
+                }}
+                options={[
+                  { value: "ALL", label: "--- Chọn tất cả ---" },
+                  ...(sourceOptions["Tháng nhận việc"] || []).map((value) => ({
+                    value,
+                    label: value,
+                  })),
+                ]}
+              />
+            </div>
+
+            {/* 4. Người tuyển dụng */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Người tuyển dụng (Chọn nhiều)
+              </label>
+              <Select
+                mode="multiple"
+                maxTagCount="responsive"
+                className="w-full"
+                allowClear
+                placeholder="Tất cả tuyển dụng"
+                value={recruiterFilter || []}
+                onChange={(selectedValues) => {
+                  const allList = sourceOptions["Tuyển dụng"] || [];
+                  if (selectedValues.includes("ALL")) {
+                    if ((recruiterFilter || []).length === allList.length) {
+                      setRecruiterFilter([]);
+                    } else {
+                      setRecruiterFilter(allList);
+                    }
+                  } else {
+                    setRecruiterFilter(selectedValues);
+                  }
+                }}
+                options={[
+                  { value: "ALL", label: "--- Chọn tất cả ---" },
+                  ...(sourceOptions["Tuyển dụng"] || []).map((value) => ({
+                    value,
+                    label: value,
+                  })),
+                ]}
+              />
+            </div>
+          </div>
+
+          {/* Hàng 3: Nút bấm thao tác giữ nguyên */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
             <div className="flex flex-wrap items-center gap-2">
               <Button

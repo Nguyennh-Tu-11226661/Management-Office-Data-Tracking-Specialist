@@ -7,10 +7,13 @@ import { prisma } from "@/lib/prisma";
 import { readImportSources } from "@/lib/import-source-store";
 import { workerSourceView } from "@/lib/worker-source-view";
 import { sourceHeader } from "@/lib/source-format";
+
 export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const denied = await guard(request);
   if (denied) return denied;
+
   try {
     const [sources, workers] = await Promise.all([
       readImportSources(),
@@ -32,7 +35,9 @@ export async function GET(request: NextRequest) {
         },
       }),
     ]);
+
     const people = new Map(workers.map((w) => [w.idCard, w]));
+
     const bonusRows = sources
       .filter((s) => s.type === "DS_THUONG")
       .sort(
@@ -58,6 +63,7 @@ export async function GET(request: NextRequest) {
             file: s.file,
           })),
       );
+
     const stored = sources
       .filter((s) => s.type === "DS_TONG")
       .sort(
@@ -65,6 +71,7 @@ export async function GET(request: NextRequest) {
           a.file.localeCompare(b.file, "vi") ||
           a.createdAt.localeCompare(b.createdAt),
       );
+
     const sourceRows = stored.flatMap((s) =>
       s.rows.map((r: any) => {
         const values = Object.fromEntries(
@@ -115,10 +122,12 @@ export async function GET(request: NextRequest) {
         };
       }),
     );
+
     const pendingDuplicateRows = sourceRows.filter(
       (r) => r.sourceDuplicates.length > 0,
     );
     const mainSourceRows = sourceRows.filter((r) => !r.sourceDuplicates.length);
+
     const sourceKey = (card: string, v: any) =>
       [
         card,
@@ -126,9 +135,11 @@ export async function GET(request: NextRequest) {
         dateKey(String(v["Ngày PV"] || "")) || String(v["Ngày PV"] || ""),
         String(v["Mã NV"] || ""),
       ].join("|");
+
     const sourcedKeys = new Set(
       mainSourceRows.map((r) => sourceKey(r.idCard, r.sourceValues)),
     );
+
     const canonical = workers
       .flatMap((w) =>
         w.assignments.map((a) => {
@@ -140,24 +151,28 @@ export async function GET(request: NextRequest) {
             fullName: w.fullName,
             idCard: w.idCard,
             phone: w.phone,
-            assignments: [{
-              id: a.id,
-              contractType: a.contractType,
-              status: a.status,
-              interviewFactory: a.interviewFactory,
-              workingFactory: a.workingFactory,
-              leaveDate: a.leaveDate,
-              leaveReason: a.leaveReason,
-              employeeCode: a.employeeCode,
-              recruiter: a.recruiter,
-              team: a.team,
-            }],
+            assignments: [
+              {
+                id: a.id,
+                contractType: a.contractType,
+                status: a.status,
+                interviewFactory: a.interviewFactory,
+                workingFactory: a.workingFactory,
+                leaveDate: a.leaveDate,
+                leaveReason: a.leaveReason,
+                employeeCode: a.employeeCode,
+                recruiter: a.recruiter,
+                team: a.team,
+              },
+            ],
             assignmentCount: w.assignments.length,
-            bankAccounts: w.bankAccounts ? w.bankAccounts.map((b: any) => ({
-              accountNumber: b.accountNumber,
-              bankName: b.bankName,
-              accountHolderName: b.accountHolderName,
-            })) : [],
+            bankAccounts: w.bankAccounts
+              ? w.bankAccounts.map((b: any) => ({
+                  accountNumber: b.accountNumber,
+                  bankName: b.bankName,
+                  accountHolderName: b.accountHolderName,
+                }))
+              : [],
             sourceValues: source.values,
             sourceWarnings: rev.warnings.map((i) => i.message),
             sourceDuplicates: rev.duplicates.map((i) => i.message),
@@ -168,9 +183,12 @@ export async function GET(request: NextRequest) {
         }),
       )
       .filter((r) => !sourcedKeys.has(sourceKey(r.idCard, r.sourceValues)));
+
     const bonusRowsByCccd = new Map<string, any[]>();
     for (const b of bonusRows) {
-      const card = String(b.values["Số CCCD"] || b.values["số CCCD"] || b.values.CCCD || "").trim();
+      const card = String(
+        b.values["Số CCCD"] || b.values["số CCCD"] || b.values.CCCD || "",
+      ).trim();
       if (!card) continue;
       let list = bonusRowsByCccd.get(card);
       if (!list) {
@@ -200,10 +218,12 @@ export async function GET(request: NextRequest) {
         rewardSource,
       };
     });
+
     const linkedRewards = new Set(
       rows.flatMap((r) => r.rewardSource.map((b) => b.id)),
     );
     const unlinkedBonusRows = bonusRows.filter((b) => !linkedRewards.has(b.id));
+
     const options: Record<string, string[]> = {};
     for (const column of [
       "Nhà máy PV",
@@ -220,32 +240,99 @@ export async function GET(request: NextRequest) {
           rows.map((r) => String(r.sourceValues[column] ?? "")).filter(Boolean),
         ),
       ].sort();
+
     const p = request.nextUrl.searchParams;
+
+    // --- TÁCH THAM SỐ CHỌN NHIỀU (MULTI-SELECT) DẠNG MẢNG ---
+    const factories = p.get("factory")?.split(",").filter(Boolean) || [];
+    const statuses = p.get("status")?.split(",").filter(Boolean) || [];
+    const sourceMonths = p.get("sourceMonth")?.split(",").filter(Boolean) || [];
+    const recruiters = p.get("recruiter")?.split(",").filter(Boolean) || [];
+    const fromDate = p.get("fromDate"); // YYYY-MM-DD
+    const toDate = p.get("toDate"); // YYYY-MM-DD
+
+    // --- CẬP NHẬT LOGIC LỌC ĐA ĐIỀU KIỆN & KHOẢNG THỜI GIAN ---
     const filtered = rows.filter((r) => {
       const v = r.sourceValues;
-      return (
-        (!p.get("month") ||
-          dateKey(String(v["Ngày PV"] || ""))?.slice(0, 7) ===
-            p.get("month")) &&
-        (!p.get("factory") || String(v["Nhà máy PV"]) === p.get("factory")) &&
-        (!p.get("status") || String(v["Tình trạng"]) === p.get("status")) &&
-        (!p.get("sourceMonth") ||
-          String(v["Tháng nhận việc"]) === p.get("sourceMonth")) &&
-        (!p.get("recruiter") ||
-          String(v["Tuyển dụng"]) === p.get("recruiter")) &&
-        (!p.get("warningsOnly") || r.sourceWarnings.length > 0) &&
-        (!p.get("search") ||
-          Object.values(v).some((x) =>
-            String(x ?? "")
-              .toLocaleLowerCase("vi")
-              .includes(p.get("search")!.toLocaleLowerCase("vi")),
-          )) &&
-        (!p.get("columnValue") ||
-          String(v[p.get("column") || ""] ?? "")
+
+      // 1. Lọc theo tháng PV (nếu có)
+      if (
+        p.get("month") &&
+        dateKey(String(v["Ngày PV"] || ""))?.slice(0, 7) !== p.get("month")
+      ) {
+        return false;
+      }
+
+      // 2. Lọc chọn nhiều: Nhà máy phỏng vấn
+      if (
+        factories.length > 0 &&
+        !factories.includes(String(v["Nhà máy PV"] || ""))
+      ) {
+        return false;
+      }
+
+      // 3. Lọc chọn nhiều: Tình trạng
+      if (
+        statuses.length > 0 &&
+        !statuses.includes(String(v["Tình trạng"] || ""))
+      ) {
+        return false;
+      }
+
+      // 4. Lọc chọn nhiều: Tháng nhận việc
+      if (
+        sourceMonths.length > 0 &&
+        !sourceMonths.includes(String(v["Tháng nhận việc"] || ""))
+      ) {
+        return false;
+      }
+
+      // 5. Lọc chọn nhiều: Tuyển dụng
+      if (
+        recruiters.length > 0 &&
+        !recruiters.includes(String(v["Tuyển dụng"] || ""))
+      ) {
+        return false;
+      }
+
+      // 6. Lọc khoảng thời gian (Từ ngày - Đến ngày dựa trên Ngày PV)
+      const pvDateStr =
+        dateKey(String(v["Ngày PV"] || "")) || String(v["Ngày PV"] || "");
+      if (fromDate && pvDateStr && pvDateStr < fromDate) {
+        return false;
+      }
+      if (toDate && pvDateStr && pvDateStr > toDate) {
+        return false;
+      }
+
+      // 7. Lọc dòng cảnh báo
+      if (p.get("warningsOnly") && r.sourceWarnings.length === 0) {
+        return false;
+      }
+
+      // 8. Tìm kiếm từ khóa
+      if (p.get("search")) {
+        const keyword = p.get("search")!.toLocaleLowerCase("vi");
+        const matchSearch = Object.values(v).some((x) =>
+          String(x ?? "")
             .toLocaleLowerCase("vi")
-            .includes(p.get("columnValue")!.toLocaleLowerCase("vi")))
-      );
+            .includes(keyword),
+        );
+        if (!matchSearch) return false;
+      }
+
+      // 9. Lọc theo cột tùy chọn
+      if (p.get("columnValue")) {
+        const colValue = String(
+          v[p.get("column") || ""] ?? "",
+        ).toLocaleLowerCase("vi");
+        const searchColValue = p.get("columnValue")!.toLocaleLowerCase("vi");
+        if (!colValue.includes(searchColValue)) return false;
+      }
+
+      return true;
     });
+
     let pendingDuplicateCount = 0;
     let systemWarningCount = 0;
     for (const s of sources) {
@@ -258,6 +345,7 @@ export async function GET(request: NextRequest) {
         if (rev.warnings.length > 0) systemWarningCount++;
       }
     }
+
     return NextResponse.json({
       success: true,
       data: filtered,
