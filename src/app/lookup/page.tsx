@@ -111,12 +111,14 @@ export default function LookupPage() {
                   {result.fullName}
                 </h2>
                 <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-3">
-                  <span>
-                    CCCD:{" "}
-                    <strong className="font-mono text-slate-700">
-                      {result.idCard}
-                    </strong>
-                  </span>
+                  {result.idCard && (
+                    <span>
+                      CCCD:{" "}
+                      <strong className="font-mono text-slate-700">
+                        {result.idCard}
+                      </strong>
+                    </span>
+                  )}
                   {result.phone && (
                     <span>
                       SĐT:{" "}

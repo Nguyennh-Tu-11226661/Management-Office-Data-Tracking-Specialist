@@ -106,8 +106,8 @@ export function parseImportRow(
   assignment.employeeCode ||= body.employeeCode || body.code || "";
   assignment.team ||= body.team || "";
   assignment.status ||= "Đang chờ phỏng vấn";
-  validateWorker(worker, assignment, true, sourceImport);
-  validateInterview(assignment);
+  validateWorker(worker, assignment, !sourceImport, sourceImport);
+  if (!sourceImport) validateInterview(assignment);
   if (
     !sourceImport &&
     ![

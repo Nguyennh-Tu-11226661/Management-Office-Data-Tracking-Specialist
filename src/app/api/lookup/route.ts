@@ -177,7 +177,6 @@ export async function POST(request: NextRequest) {
         data: {
           id: worker.id,
           fullName: worker.fullName,
-          idCard: "••••" + worker.idCard.slice(-4),
           phone: worker.phone
             ? worker.phone.slice(0, 3) + "••••" + worker.phone.slice(-3)
             : null,
@@ -192,6 +191,19 @@ export async function POST(request: NextRequest) {
                 onboardingMonth: primaryAssignment.onboardingMonth,
               }
             : null,
+          bonusRecords: worker.bonusRecords.map((r) => ({
+            id: r.id,
+            month: r.month,
+            status: r.status,
+            bonus1: r.bonus1,
+            bonus2: r.bonus2,
+            bonus3: r.bonus3,
+            bonus4: r.bonus4,
+            bonus5: r.bonus5,
+            bonus6: r.bonus6,
+            bonus7: r.bonus7,
+            totalBonus: r.totalBonus,
+          })),
           bankAccount: b
             ? {
                 accountNumber: "••••" + b.accountNumber.slice(-4),

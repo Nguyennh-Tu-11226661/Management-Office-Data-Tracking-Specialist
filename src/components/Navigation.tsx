@@ -47,8 +47,8 @@ const navGroups: NavGroup[] = [
   {
     group: 'BÁO CÁO & KPI',
     items: [
-      { href: '/workers', label: 'Hồ sơ lao động (DS_TONG)', icon: FileText },
       { href: '/', label: 'Tổng quan Dashboard', icon: LayoutDashboard },
+      { href: '/workers', label: 'Hồ sơ lao động (DS_TONG)', icon: FileText },
       { href: '/performance', label: 'Đánh giá & So sánh KPI', icon: TrendingUp },
       { href: '/orders', label: 'Đơn hàng & đợt tuyển', icon: Target },
       { href: '/duplicates', label: 'Cảnh báo trùng lặp', icon: ShieldAlert },

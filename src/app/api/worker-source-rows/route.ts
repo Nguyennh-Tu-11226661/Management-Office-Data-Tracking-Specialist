@@ -74,24 +74,43 @@ export async function GET(request: NextRequest) {
           values["Số CCCD"] || values["số CCCD"] || values.CCCD || "",
         ).trim();
         const worker = people.get(card);
+        const rev = splitImportReview([
+          ...(r.warnings || []),
+          ...(r.duplicates || []),
+        ]);
+        const cleanAssignments = worker
+          ? worker.assignments.map((a: any) => ({
+              id: a.id,
+              contractType: a.contractType,
+              status: a.status,
+              interviewFactory: a.interviewFactory,
+              workingFactory: a.workingFactory,
+              leaveDate: a.leaveDate,
+              leaveReason: a.leaveReason,
+              employeeCode: a.employeeCode,
+              recruiter: a.recruiter,
+              team: a.team,
+            }))
+          : [];
+        const cleanBanks = worker?.bankAccounts
+          ? worker.bankAccounts.map((b: any) => ({
+              accountNumber: b.accountNumber,
+              bankName: b.bankName,
+              accountHolderName: b.accountHolderName,
+            }))
+          : [];
         return {
           id: `source-${s.id}-${r.row}`,
           sourceValues: values,
-          sourceWarnings: splitImportReview([
-            ...(r.warnings || []),
-            ...(r.duplicates || []),
-          ]).warnings.map((i) => i.message),
-          sourceDuplicates: splitImportReview([
-            ...(r.warnings || []),
-            ...(r.duplicates || []),
-          ]).duplicates.map((i) => i.message),
+          sourceWarnings: rev.warnings.map((i) => i.message),
+          sourceDuplicates: rev.duplicates.map((i) => i.message),
           sourceFile: s.file,
           sourceRow: r.row,
           workerId: worker?.id,
           fullName: values["Họ và tên"],
           idCard: card,
-          assignments: worker?.assignments || [],
-          bankAccounts: worker?.bankAccounts || [],
+          assignments: cleanAssignments,
+          bankAccounts: cleanBanks,
           isSourceRow: true,
         };
       }),
@@ -114,19 +133,34 @@ export async function GET(request: NextRequest) {
       .flatMap((w) =>
         w.assignments.map((a) => {
           const source = workerSourceView(w, a);
+          const rev = splitImportReview(source.warnings);
           return {
-            ...w,
             id: `${w.id}-${a.id}`,
             workerId: w.id,
-            assignments: [a],
+            fullName: w.fullName,
+            idCard: w.idCard,
+            phone: w.phone,
+            assignments: [{
+              id: a.id,
+              contractType: a.contractType,
+              status: a.status,
+              interviewFactory: a.interviewFactory,
+              workingFactory: a.workingFactory,
+              leaveDate: a.leaveDate,
+              leaveReason: a.leaveReason,
+              employeeCode: a.employeeCode,
+              recruiter: a.recruiter,
+              team: a.team,
+            }],
             assignmentCount: w.assignments.length,
+            bankAccounts: w.bankAccounts ? w.bankAccounts.map((b: any) => ({
+              accountNumber: b.accountNumber,
+              bankName: b.bankName,
+              accountHolderName: b.accountHolderName,
+            })) : [],
             sourceValues: source.values,
-            sourceWarnings: splitImportReview(source.warnings).warnings.map(
-              (i) => i.message,
-            ),
-            sourceDuplicates: splitImportReview(source.warnings).duplicates.map(
-              (i) => i.message,
-            ),
+            sourceWarnings: rev.warnings.map((i) => i.message),
+            sourceDuplicates: rev.duplicates.map((i) => i.message),
             sourceFile: source.hasSource
               ? "Import trước khi lưu bản nguồn"
               : "Hồ sơ nội bộ",
@@ -134,22 +168,38 @@ export async function GET(request: NextRequest) {
         }),
       )
       .filter((r) => !sourcedKeys.has(sourceKey(r.idCard, r.sourceValues)));
-    const rows = [...mainSourceRows, ...canonical].map((r) => ({
-      ...r,
-      rewardSource: bonusRows.filter(
-        (b) =>
-          String(b.values["Số CCCD"] || b.values["số CCCD"] || "").trim() ===
-            r.idCard &&
-          (matchFactory(
-            String(b.values["Công ty"] || ""),
-            String(r.sourceValues["Nhà máy PV"] || ""),
-          ) ||
-            matchFactory(
-              String(b.values["Công ty"] || ""),
-              String(r.sourceValues["Nhà máy làm việc"] || ""),
-            )),
-      ),
-    }));
+    const bonusRowsByCccd = new Map<string, any[]>();
+    for (const b of bonusRows) {
+      const card = String(b.values["Số CCCD"] || b.values["số CCCD"] || b.values.CCCD || "").trim();
+      if (!card) continue;
+      let list = bonusRowsByCccd.get(card);
+      if (!list) {
+        list = [];
+        bonusRowsByCccd.set(card, list);
+      }
+      list.push(b);
+    }
+
+    const rows = [...mainSourceRows, ...canonical].map((r) => {
+      const candidateBonuses = bonusRowsByCccd.get(r.idCard);
+      const rewardSource = candidateBonuses
+        ? candidateBonuses.filter(
+            (b) =>
+              matchFactory(
+                String(b.values["Công ty"] || ""),
+                String(r.sourceValues["Nhà máy PV"] || ""),
+              ) ||
+              matchFactory(
+                String(b.values["Công ty"] || ""),
+                String(r.sourceValues["Nhà máy làm việc"] || ""),
+              ),
+          )
+        : [];
+      return {
+        ...r,
+        rewardSource,
+      };
+    });
     const linkedRewards = new Set(
       rows.flatMap((r) => r.rewardSource.map((b) => b.id)),
     );
@@ -196,34 +246,24 @@ export async function GET(request: NextRequest) {
             .includes(p.get("columnValue")!.toLocaleLowerCase("vi")))
       );
     });
+    let pendingDuplicateCount = 0;
+    let systemWarningCount = 0;
+    for (const s of sources) {
+      for (const r of s.rows) {
+        const rawW = r.warnings || [];
+        const rawD = r.duplicates || [];
+        if (!rawW.length && !rawD.length) continue;
+        const rev = splitImportReview([...rawW, ...rawD]);
+        if (rev.duplicates.length > 0) pendingDuplicateCount++;
+        if (rev.warnings.length > 0) systemWarningCount++;
+      }
+    }
     return NextResponse.json({
       success: true,
       data: filtered,
       options,
-      pendingDuplicateCount: sources.reduce(
-        (n, s) =>
-          n +
-          s.rows.filter(
-            (r: any) =>
-              splitImportReview([
-                ...(r.warnings || []),
-                ...(r.duplicates || []),
-              ]).duplicates.length > 0,
-          ).length,
-        0,
-      ),
-      systemWarningCount: sources.reduce(
-        (n, s) =>
-          n +
-          s.rows.filter(
-            (r: any) =>
-              splitImportReview([
-                ...(r.warnings || []),
-                ...(r.duplicates || []),
-              ]).warnings.length > 0,
-          ).length,
-        0,
-      ),
+      pendingDuplicateCount,
+      systemWarningCount,
       unlinkedBonusRows,
       bonusSourceRows: bonusRows.length,
       totalRows: rows.length,

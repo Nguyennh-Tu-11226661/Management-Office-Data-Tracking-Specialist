@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
     const commit = form.get('confirm') === 'true';
     const confirmPhone = form.get('confirmPhoneDuplicate') === 'true';
     const confirmActive = form.get('confirmActiveDuplicate') === 'true';
+    const smartMerge = form.get('smartMerge') !== 'false';
     const actor = (await identity(request))!;
     const requestedType = String(form.get('importType') || 'AUTO').toUpperCase();
 
@@ -212,6 +213,7 @@ export async function POST(request: NextRequest) {
     let duplicateCount = 0;
     let errorCount = 0;
     let rehireCount = 0;
+    let mergedCount = 0;
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -221,6 +223,8 @@ export async function POST(request: NextRequest) {
     if (detectedType === 'DS_THUONG') {
       const workers = await prisma.worker.findMany({ include: { assignments: true } });
       const workerMap = new Map(workers.map(w => [w.idCard, w]));
+
+      const commitTasks: Array<(tx: any) => Promise<void>> = [];
 
       for (const e of entries) {
         try {
@@ -267,7 +271,7 @@ export async function POST(request: NextRequest) {
           const sourceNote=JSON.stringify({source:'SOURCE_EXCEL_ACTUAL_PAID',monthOriginal:raw['Tháng'],sourceValues:raw,rewards:Array.from({length:7},(_,i)=>String(raw['Thưởng lần '+(i+1)]||'')),paymentDate:null,reference:null});
 
           if (commit) {
-            await prisma.$transaction(async tx => {
+            commitTasks.push(async (tx) => {
               if (!worker) {
                 worker = await tx.worker.create({
                   data: {
@@ -360,7 +364,6 @@ export async function POST(request: NextRequest) {
                 }
               });
             });
-            successCount++;
           } else {
             readyCount++;
           }
@@ -370,8 +373,21 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      if (commit && commitTasks.length > 0) {
+        const BATCH_SIZE = 100;
+        for (let i = 0; i < commitTasks.length; i += BATCH_SIZE) {
+          const chunk = commitTasks.slice(i, i + BATCH_SIZE);
+          await prisma.$transaction(async (tx) => {
+            for (const task of chunk) {
+              await task(tx);
+            }
+          }, { timeout: 60000 });
+          successCount += chunk.length;
+        }
+      }
+
       const review=splitImportReview([...warnings,...errors]);
-    const sourceId=commit?await saveImportSource(detectedType,fileName,targetSheetName,entries,warnings,errors):null;
+      const sourceId=commit?await saveImportSource(detectedType,fileName,targetSheetName,entries,warnings,errors):null;
       return NextResponse.json({
         review, sourceId, normalizedSaved:successCount, sourceRowsSaved:commit?entries.length:0,mainSourceRows:entries.length-review.duplicateRows,pendingDuplicateCount:review.duplicateRows,
         success: true,
@@ -379,8 +395,8 @@ export async function POST(request: NextRequest) {
         detectedType: 'DS_THUONG',
         detectedTypeName: 'Bảng thưởng các lần 1 → 7 (DS_THUONG)',
         sheetUsed: targetSheetName,
-        summary: { totalRows: entries.length, successCount:commit?entries.length:0, readyCount:commit?0:entries.length, duplicateCount:review.duplicateRows, errorCount:0, warningCount:review.warningRows, cleanCount:entries.length-review.reviewRows, rehireCount }, normalizationErrors:errors,
-        errors:[],
+        summary: { totalRows: entries.length, successCount:commit?successCount:0, readyCount:commit?0:readyCount, duplicateCount:duplicateCount||review.duplicateRows, errorCount, warningCount:review.warningRows, cleanCount:entries.length-review.reviewRows, rehireCount }, normalizationErrors:errors,
+        errors,
         warnings:review.warnings.map(i=>i.message), duplicates:review.duplicates.map(i=>i.message)
       });
     }
@@ -391,6 +407,8 @@ export async function POST(request: NextRequest) {
     if (detectedType === 'BANK_ACCOUNTS') {
       const workers = await prisma.worker.findMany({ include: { bankAccounts: true } });
       const workerMap = new Map(workers.map(w => [w.idCard, w]));
+
+      const commitTasks: Array<(tx: any) => Promise<void>> = [];
 
       for (const e of entries) {
         try {
@@ -419,7 +437,7 @@ export async function POST(request: NextRequest) {
 
           if(worker?.bankAccounts.some(a=>a.accountNumber===accountNumber))throw new Error('STK trùng hồ sơ đã có — giữ riêng chờ kiểm tra');
           if (commit) {
-            await prisma.$transaction(async tx => {
+            commitTasks.push(async (tx) => {
               if (!worker) {
                 worker = await tx.worker.create({
                   data: {
@@ -481,7 +499,6 @@ export async function POST(request: NextRequest) {
                 }
               });
             });
-            successCount++;
           } else {
             readyCount++;
           }
@@ -491,8 +508,21 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      if (commit && commitTasks.length > 0) {
+        const BATCH_SIZE = 100;
+        for (let i = 0; i < commitTasks.length; i += BATCH_SIZE) {
+          const chunk = commitTasks.slice(i, i + BATCH_SIZE);
+          await prisma.$transaction(async (tx) => {
+            for (const task of chunk) {
+              await task(tx);
+            }
+          }, { timeout: 60000 });
+          successCount += chunk.length;
+        }
+      }
+
       const review=splitImportReview([...warnings,...errors]);
-    const sourceId=commit?await saveImportSource(detectedType,fileName,targetSheetName,entries,warnings,errors):null;
+      const sourceId=commit?await saveImportSource(detectedType,fileName,targetSheetName,entries,warnings,errors):null;
       return NextResponse.json({
         review, sourceId, normalizedSaved:successCount, sourceRowsSaved:commit?entries.length:0,mainSourceRows:entries.length-review.duplicateRows,pendingDuplicateCount:review.duplicateRows,
         success: true,
@@ -500,8 +530,8 @@ export async function POST(request: NextRequest) {
         detectedType: 'BANK_ACCOUNTS',
         detectedTypeName: 'Đối soát số tài khoản ngân hàng (STK)',
         sheetUsed: targetSheetName,
-        summary: { totalRows: entries.length, successCount:commit?entries.length:0, readyCount:commit?0:entries.length, duplicateCount:review.duplicateRows, errorCount:0, warningCount:review.warningRows, cleanCount:entries.length-review.reviewRows, rehireCount }, normalizationErrors:errors,
-        errors:[],
+        summary: { totalRows: entries.length, successCount:commit?successCount:0, readyCount:commit?0:readyCount, duplicateCount:duplicateCount||review.duplicateRows, errorCount, warningCount:review.warningRows, cleanCount:entries.length-review.reviewRows, rehireCount }, normalizationErrors:errors,
+        errors,
         warnings:review.warnings.map(i=>i.message), duplicates:review.duplicates.map(i=>i.message)
       });
     }
@@ -514,7 +544,7 @@ export async function POST(request: NextRequest) {
     }
 
     const mapping = profile ? JSON.parse(profile.mappingJson) : null;
-    const existing = await prisma.worker.findMany({ include: { assignments: true } });
+    const existing = await prisma.worker.findMany({ include: { assignments: true, bankAccounts: true } });
     const people = new Map(existing.map(w => [w.idCard, w]));
     const statuses = await prisma.laborStatus.findMany({ where: { isActive: true } });
     const warns = new Set(statuses.filter(s => s.warnsDuplicate).map(s => s.name));
@@ -524,6 +554,8 @@ export async function POST(request: NextRequest) {
       fullName: 'Họ và tên',
       idCard: 'số CCCD',
       interviewFactory: 'Nhà máy PV',
+      workingFactory: 'Nhà máy làm việc',
+      contractType: 'Loại HĐ',
       interviewDate: 'Ngày PV',
       employeeCode: 'Mã nhân viên',
       interviewResult: 'Kết quả PV',
@@ -533,16 +565,43 @@ export async function POST(request: NextRequest) {
       phone: 'SĐT',
       dob: 'Ngày sinh',
       gender: 'Giới tính',
+      address: 'Địa chỉ',
       province: 'Tỉnh/Thành',
       recruiter: 'Tuyển dụng',
+      source: 'Nguồn',
       status: 'Tình trạng',
       startDate: 'Ngày bắt đầu làm',
       leaveDate: 'Ngày NH',
       leaveReason: 'Lý do',
-      onboardingMonth: 'Tháng nhận việc'
+      onboardingMonth: 'Tháng nhận việc',
+      shuttleBusKtx: 'Đón xe - KTX',
+      expectedTrainingDate: 'Ngày ĐT dự kiến',
+      expectedTrainingStatus: 'TT ĐT dự kiến',
+      standardTrainingDate: 'Ngày ĐT chuẩn',
+      idCardDate: 'Ngày cấp CCCD',
+      idCardPlace: 'Nơi cấp CCCD',
     };
 
+    const activeWorkerByPhone = new Map<string, { idCard: string; fullName: string }>();
+    for (const w of people.values()) {
+      if (w.archivedAt || !w.phone) continue;
+      const pk = phoneKey(w.phone);
+      if (!pk) continue;
+      const isActive = w.assignments.some(
+        (a: any) =>
+          warns.has(a.status) ||
+          (!a.leaveDate &&
+            ['đang làm việc', 'đang lv', 'hết phí', 'chưa đào tạo', 'lv'].some(
+              (s) => (a.status || '').toLowerCase().includes(s)
+            ))
+      );
+      if (isActive && !activeWorkerByPhone.has(pk)) {
+        activeWorkerByPhone.set(pk, { idCard: w.idCard, fullName: w.fullName });
+      }
+    }
+
     const seenInFile = new Map<string, number>();
+    const commitTasks: Array<(tx: any) => Promise<void>> = [];
 
     for (const e of entries) {
       try {
@@ -558,8 +617,8 @@ export async function POST(request: NextRequest) {
           warnings.push(`Dòng ${e.row}: nguồn xác nhận Đỗ, ngày đỗ dùng ngày PV; kiểm tra ở bước xem trước.`);
         }
         const rowWarnings:string[]=[];try{parseImportRow(raw);}catch(issue:any){rowWarnings.push(issue.message);warnings.push(`Dòng ${e.row}: giữ thông tin nguồn, cần kiểm tra: ${issue.message}`);}
-        if (!assignment.interviewDate||!dateKey(assignment.interviewDate)) throw new Error('Cần ngày PV để lưu đúng lượt tuyển và báo cáo');
-        if (!statuses.some(s => s.name === assignment.status)&&!sourceStatuses.includes(assignment.status)) throw new Error('Trạng thái chưa có trong danh mục: ' + assignment.status);
+        if (!assignment.interviewDate||!dateKey(assignment.interviewDate)) warnings.push(`Dòng ${e.row}: Cần ngày PV để lưu đúng lượt tuyển và báo cáo`);
+        if (!statuses.some(s => s.name === assignment.status)&&!sourceStatuses.includes(assignment.status)) warnings.push(`Dòng ${e.row}: Trạng thái chưa có trong danh mục: ${assignment.status}`);
         for (const k of ['orderId', 'batchId']) if (!assignment[k]) delete assignment[k];
 
         // 1. Kiểm tra trùng lặp nội bộ trong file (cùng CCCD + Nhà máy PV + Ngày PV)
@@ -581,91 +640,194 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // 3. Tìm lượt tuyển đã có trong CSDL để Cập nhật (Update) hoặc Đồng bộ (Sync)
+        // 3. Kiểm tra trùng lượt tuyển đã có trong CSDL (Bổ sung thông tin còn thiếu hoặc cảnh báo trùng)
         const matchAssignment = old?.assignments.find(a =>
           identityKey(a) === identityKey(assignment) ||
           (a.interviewFactory === assignment.interviewFactory && dateKey(a.interviewDate) === dateKey(assignment.interviewDate)) ||
           (assignment.employeeCode && a.employeeCode === assignment.employeeCode && a.interviewFactory === assignment.interviewFactory)
         );
 
-        // 4. Cảnh báo nghiệp vụ (không chặn nạp): Chưa báo nghỉ & Trùng SĐT
-        if (!matchAssignment) {
-          const activeAssignment = old?.assignments.find(a => warns.has(a.status) || (!a.leaveDate && ['đang làm việc', 'đang lv', 'hết phí', 'chưa đào tạo', 'lv'].some(s => (a.status || '').toLowerCase().includes(s))));
-          if (activeAssignment) {
-            const actFactory = activeAssignment.workingFactory || activeAssignment.interviewFactory || 'Xưởng cũ';
-            warnings.push(`Dòng ${e.row}: [CHƯA BÁO NGHỈ] Đang làm việc tại ${actFactory} nhưng đăng ký PV tại ${assignment.interviewFactory || 'xưởng mới'}.`);
+        if (matchAssignment) {
+          // Kiểm tra xem file có trường thông tin nào mới để bổ sung (Smart Merge) hay không
+          const workerFillable: Array<keyof typeof worker> = [
+            'code', 'dob', 'gender', 'phone', 'address', 'province',
+            'recruiter', 'team', 'source', 'idCardDate', 'idCardPlace'
+          ];
+          const workerUpdates: Record<string, any> = {};
+          for (const f of workerFillable) {
+            const currentVal = (old as any)?.[f];
+            const newVal = worker[f];
+            if ((!currentVal || String(currentVal).trim() === '') && (newVal && String(newVal).trim() !== '')) {
+              workerUpdates[f] = newVal;
+            }
           }
 
-          const activePhoneWorker = worker.phone && [...people.values()].find(w => w.idCard !== worker.idCard && w.phone && phoneKey(w.phone) === worker.phone && !w.archivedAt && w.assignments.some(a => warns.has(a.status) || (!a.leaveDate && ['đang làm việc', 'đang lv', 'hết phí', 'chưa đào tạo', 'lv'].some(s => (a.status || '').toLowerCase().includes(s)))));
-          if (activePhoneWorker) {
-            warnings.push(`Dòng ${e.row}: [CHÚ Ý SĐT] SĐT ${worker.phone} đang trùng với công nhân ${activePhoneWorker.fullName} (${activePhoneWorker.idCard}).`);
+          const assignmentFillable: Array<keyof typeof assignment> = [
+            'workingFactory', 'contractType', 'employeeCode', 'team',
+            'startDate', 'passedDate', 'onboardingMonth', 'recruiter',
+            'shuttleBusKtx', 'expectedTrainingDate', 'expectedTrainingStatus',
+            'standardTrainingDate', 'leaveDate', 'leaveReason'
+          ];
+          const assignmentUpdates: Record<string, any> = {};
+          for (const f of assignmentFillable) {
+            const currentVal = (matchAssignment as any)[f];
+            const newVal = assignment[f];
+            if ((!currentVal || String(currentVal).trim() === '') && (newVal && String(newVal).trim() !== '')) {
+              assignmentUpdates[f] = newVal;
+            }
           }
+
+          // Bổ sung kết quả PV / Tình trạng nếu đợt cũ đang ở trạng thái chờ/chưa rõ
+          if (
+            (matchAssignment.interviewResult === 'UNKNOWN' || matchAssignment.interviewResult === 'PENDING') &&
+            assignment.interviewResult &&
+            assignment.interviewResult !== 'UNKNOWN' &&
+            assignment.interviewResult !== 'PENDING'
+          ) {
+            assignmentUpdates.interviewResult = assignment.interviewResult;
+          }
+          if (
+            (!matchAssignment.status || matchAssignment.status === 'Đang chờ phỏng vấn') &&
+            assignment.status &&
+            assignment.status !== 'Đang chờ phỏng vấn'
+          ) {
+            assignmentUpdates.status = assignment.status;
+          }
+
+          const rawStk = raw['STK'] || raw['Số tài khoản'];
+          const rawBankName = raw['Ngân hàng'];
+          const needBankAdd = Boolean(rawStk && String(rawStk).trim() && (!old?.bankAccounts || old.bankAccounts.length === 0));
+
+          const updatedFieldKeys = [
+            ...Object.keys(workerUpdates).map(k => labels[k] || k),
+            ...Object.keys(assignmentUpdates).map(k => labels[k] || k),
+            ...(needBankAdd ? ['Số tài khoản (STK)'] : [])
+          ];
+
+          if (smartMerge && updatedFieldKeys.length > 0) {
+            if (commit) {
+              commitTasks.push(async (tx) => {
+                if (Object.keys(workerUpdates).length > 0) {
+                  await tx.worker.update({
+                    where: { id: old!.id },
+                    data: workerUpdates
+                  });
+                  Object.assign(old!, workerUpdates);
+                }
+                if (Object.keys(assignmentUpdates).length > 0) {
+                  await tx.workAssignment.update({
+                    where: { id: matchAssignment.id },
+                    data: assignmentUpdates
+                  });
+                  Object.assign(matchAssignment, assignmentUpdates);
+                }
+                if (needBankAdd) {
+                  const hasBank = await tx.bankAccount.findFirst({ where: { workerId: old!.id, accountNumber: String(rawStk).trim() } });
+                  if (!hasBank) {
+                    await tx.bankAccount.create({
+                      data: {
+                        workerId: old!.id,
+                        accountNumber: String(rawStk).trim(),
+                        accountHolderName: worker.fullName || old!.fullName,
+                        bankName: rawBankName ? String(rawBankName).trim() : 'Ngân hàng đối soát',
+                        verificationStatus: 'UNVERIFIED',
+                        isNameVerified: false,
+                        checkResult: 'Tự động bổ sung từ file nạp cập nhật'
+                      }
+                    });
+                    if (old) {
+                      (old as any).bankAccounts = (old as any).bankAccounts || [];
+                      (old as any).bankAccounts.push({ accountNumber: String(rawStk).trim() });
+                    }
+                  }
+                }
+                await tx.assignmentEvent.create({
+                  data: {
+                    assignmentId: matchAssignment.id,
+                    occurredOn: today(),
+                    toStatus: assignmentUpdates.status || matchAssignment.status,
+                    interviewResult: assignmentUpdates.interviewResult || matchAssignment.interviewResult,
+                    operator: actor.username,
+                    note: `Smart Merge: Bổ sung thông tin từ Excel (${fileName}) — ${updatedFieldKeys.join(', ')}`
+                  }
+                });
+                await tx.auditLog.create({
+                  data: {
+                    module: 'WORKER',
+                    action: 'UPDATE',
+                    operator: actor.username,
+                    details: `Dòng ${e.row}: Bổ sung thông tin cho hồ sơ ${worker.idCard} (${old!.fullName}), đợt ${matchAssignment.interviewFactory}: ${updatedFieldKeys.join(', ')}`
+                  }
+                });
+              });
+            } else {
+              readyCount++;
+            }
+            mergedCount++;
+            continue;
+          }
+
+          duplicateCount++;
+          errors.push(`Dòng ${e.row}: Trùng lặp nội bộ — CCCD ${worker.idCard} đã có lượt tuyển tại ${matchAssignment.interviewFactory} (ngày PV: ${matchAssignment.interviewDate || '—'}).`);
+          continue;
+        }
+
+        // 4. Cảnh báo nghiệp vụ (không chặn nạp): Chưa báo nghỉ & Trùng SĐT
+        const activeAssignment = old?.assignments.find(a => warns.has(a.status) || (!a.leaveDate && ['đang làm việc', 'đang lv', 'hết phí', 'chưa đào tạo', 'lv'].some(s => (a.status || '').toLowerCase().includes(s))));
+        if (activeAssignment) {
+          const actFactory = activeAssignment.workingFactory || activeAssignment.interviewFactory || 'Xưởng cũ';
+          warnings.push(`Dòng ${e.row}: [CHƯA BÁO NGHỈ] Đang làm việc tại ${actFactory} nhưng đăng ký PV tại ${assignment.interviewFactory || 'xưởng mới'}.`);
+        }
+
+        const matchPhone = worker.phone ? activeWorkerByPhone.get(phoneKey(worker.phone)) : null;
+        const activePhoneWorker = matchPhone && matchPhone.idCard !== worker.idCard ? matchPhone : null;
+        if (activePhoneWorker) {
+          warnings.push(`Dòng ${e.row}: [CHÚ Ý SĐT] SĐT ${worker.phone} đang trùng với công nhân ${activePhoneWorker.fullName} (${activePhoneWorker.idCard}).`);
         }
 
         const sourceStatus=sourceStatuses.includes(assignment.status)&&!statuses.some(s=>s.name===assignment.status);
         if(sourceStatus)warnings.push(`Dòng ${e.row}: giữ nguyên mã tình trạng nguồn ${assignment.status}; chưa diễn giải.`);
-        if(!sourceStatus)await assignmentRelations(prisma, assignment);
 
         if (commit) {
-          await prisma.$transaction(async tx => {
-            if(sourceStatus)await tx.laborStatus.upsert({where:{name:assignment.status},create:{name:assignment.status,category:'SOURCE',warnsDuplicate:false,endsAssignment:false},update:{}});
-            
-            if (matchAssignment) {
-              // Cập nhật thông tin mới nhất vào lượt tuyển đã có
-              const updated = await tx.workAssignment.update({
-                where: { id: matchAssignment.id },
-                data: {
-                  status: assignment.status || matchAssignment.status,
-                  employeeCode: assignment.employeeCode || matchAssignment.employeeCode,
-                  interviewResult: assignment.interviewResult || matchAssignment.interviewResult,
-                  passedDate: assignment.passedDate || matchAssignment.passedDate,
-                  startDate: assignment.startDate || matchAssignment.startDate,
-                  leaveDate: assignment.leaveDate !== undefined ? (assignment.leaveDate || null) : matchAssignment.leaveDate,
-                  leaveReason: assignment.leaveReason || matchAssignment.leaveReason,
-                  team: assignment.team || matchAssignment.team,
-                  recruiter: assignment.recruiter || matchAssignment.recruiter,
-                  contractType: assignment.contractType || matchAssignment.contractType,
-                  shuttleBusKtx: assignment.shuttleBusKtx || matchAssignment.shuttleBusKtx,
-                }
-              });
-              if (worker.phone || worker.dob || worker.gender || worker.province) {
-                await tx.worker.update({
-                  where: { id: old!.id },
-                  data: {
-                    phone: worker.phone || old!.phone,
-                    dob: worker.dob || old!.dob,
-                    gender: worker.gender || old!.gender,
-                    province: worker.province || old!.province,
-                  }
-                });
-              }
-              await tx.assignmentEvent.create({ data: { assignmentId: updated.id, occurredOn: today(), toStatus: updated.status, interviewResult: updated.interviewResult, operator: actor.username, note: 'Import Excel (Update) — source:'+JSON.stringify({row:e.row,sheet:targetSheetName,file:fileName,values:raw,warnings:rowWarnings}) } });
-              await tx.auditLog.create({ data: { module: 'WORKER', action: 'UPDATE', operator: actor.username, details: `Dòng ${e.row}: cập nhật hồ sơ ${old!.id}, lượt ${updated.id}` } });
-            } else {
-              // Thêm mới hoặc tái tuyển dụng
+          const canNormalize = /^(\d{9}|\d{12})$/.test(worker.idCard) && !!dateKey(assignment.interviewDate) && !!assignment.interviewFactory;
+          if (canNormalize) {
+            commitTasks.push(async (tx) => {
+              if(sourceStatus)await tx.laborStatus.upsert({where:{name:assignment.status},create:{name:assignment.status,category:'SOURCE',warnsDuplicate:false,endsAssignment:false},update:{}});
               let person = await tx.worker.findUnique({ where: { idCard: worker.idCard }, include: { assignments: true } });
               if (!person) person = await tx.worker.create({ data: { ...worker, fullName: worker.fullName, idCard: worker.idCard }, include: { assignments: true } });
               const a = await tx.workAssignment.create({ data: { ...assignment, interviewFactory: assignment.interviewFactory, workerId: person.id } });
               await tx.assignmentEvent.create({ data: { assignmentId: a.id, occurredOn: today(), toStatus: a.status, interviewResult: a.interviewResult, operator: actor.username, note: 'Import Excel — source:'+JSON.stringify({row:e.row,sheet:targetSheetName,file:fileName,values:raw,warnings:rowWarnings}) } });
               await tx.auditLog.create({ data: { module: 'WORKER', action: 'IMPORT', operator: actor.username, details: `Dòng ${e.row}: hồ sơ ${person.id}, lượt ${a.id}${old ? ' (thêm lịch sử vào hồ sơ cũ)' : ''}` } });
-            }
-          });
-          successCount++;
+            });
+          } else {
+            errors.push(`Dòng ${e.row}: Không thể chuẩn hóa vào hồ sơ: ${rowWarnings.join('; ') || 'Dữ liệu chưa hợp lệ'}`);
+          }
         } else {
           readyCount++;
         }
 
         if (old) {
-          if (!matchAssignment) {
-            rehireCount++;
-            old.assignments.push({ ...assignment, id: 'preview-' + e.row } as any);
-          }
+          rehireCount++;
+          old.assignments.push({ ...assignment, id: 'preview-' + e.row } as any);
         } else {
           people.set(worker.idCard, { ...worker, id: 'preview-' + e.row, assignments: [{ ...assignment, id: 'preview-' + e.row }], archivedAt: null } as any);
         }
       } catch (error: any) {
         errorCount++;
         errors.push(`Dòng ${e.row}: ${error.code ? 'Không thể lưu dòng dữ liệu' : error.message}`);
+      }
+    }
+
+    if (commit && commitTasks.length > 0) {
+      const BATCH_SIZE = 100;
+      for (let i = 0; i < commitTasks.length; i += BATCH_SIZE) {
+        const chunk = commitTasks.slice(i, i + BATCH_SIZE);
+        await prisma.$transaction(async (tx) => {
+          for (const task of chunk) {
+            await task(tx);
+          }
+        }, { timeout: 60000 });
+        successCount += chunk.length;
       }
     }
 
@@ -678,8 +840,8 @@ export async function POST(request: NextRequest) {
       detectedType: 'DS_TONG',
       detectedTypeName: 'Hồ sơ nhân sự tổng (DS_TONG)',
       sheetUsed: targetSheetName,
-      summary: { totalRows: entries.length, successCount:commit?entries.length:0, readyCount:commit?0:entries.length, duplicateCount:review.duplicateRows, errorCount:0, warningCount:review.warningRows, cleanCount:entries.length-review.reviewRows, rehireCount }, normalizationErrors:errors,
-      errors:[],
+      summary: { totalRows: entries.length, successCount:commit?successCount:0, readyCount:commit?0:readyCount, duplicateCount:duplicateCount||review.duplicateRows, errorCount, warningCount:review.warningRows, cleanCount:entries.length-review.reviewRows, rehireCount, mergedCount }, normalizationErrors:errors,
+      errors,
       warnings:review.warnings.map(i=>i.message), duplicates:review.duplicates.map(i=>i.message)
     });
   } catch (err: any) {

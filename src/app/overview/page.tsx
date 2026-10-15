@@ -55,7 +55,7 @@ export default function OverviewPage() {
   const user = useIdentity();
   const [data, setData] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
-  const [workers, setWorkers] = useState<any[]>([]);
+  const [catalogs, setCatalogs] = useState<any[]>([]);
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
@@ -78,11 +78,11 @@ export default function OverviewPage() {
     load();
     Promise.all([
       fetch("/api/orders").then((r) => r.json()),
-      fetch("/api/workers").then((r) => r.json()),
+      fetch("/api/catalogs").then((r) => r.json()),
     ])
-      .then(([o, w]) => {
+      .then(([o, c]) => {
         setOrders(o.data || []);
-        setWorkers(w.data || []);
+        setCatalogs(c.data || []);
       })
       .catch(() => {});
   }, []);
@@ -98,9 +98,7 @@ export default function OverviewPage() {
   const factoryNames = [
     ...new Set([
       ...orders.map((o) => o.factory),
-      ...workers.flatMap((w) =>
-        w.assignments.map((a: any) => a.interviewFactory),
-      ),
+      ...catalogs.map((c: any) => c.name),
     ]),
   ].filter(Boolean);
 

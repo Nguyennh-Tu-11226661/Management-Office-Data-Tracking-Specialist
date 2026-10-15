@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Upload, Button, Card, message, Alert, Table, Tag, Select, Segmented, Tabs, Popconfirm, Input } from 'antd';
-import { FileSpreadsheet, UploadCloud, Download, CheckCircle2, AlertTriangle, Coins, CreditCard, Users, Sparkles, Trash2, Link2, Globe } from 'lucide-react';
+import { Upload, Button, Card, message, Alert, Table, Tag, Select, Segmented, Tabs, Popconfirm, Input, Checkbox } from 'antd';
+import { FileSpreadsheet, UploadCloud, Download, CheckCircle2, AlertTriangle, Coins, CreditCard, Users, Sparkles, Trash2, Link2, Globe, Layers } from 'lucide-react';
 
 const { Dragger } = Upload;
 
@@ -13,6 +13,7 @@ export default function ExcelToolsPage() {
     const [googleSheetUrl, setGoogleSheetUrl] = useState('');
     const [uploading, setUploading] = useState(false);
     const [clearing, setClearing] = useState(false);
+    const [smartMerge, setSmartMerge] = useState(true);
     const [pendingFile, setPendingFile] = useState<File | null>(null);
     const [result, setResult] = useState<any>(null);
 
@@ -29,6 +30,7 @@ export default function ExcelToolsPage() {
             const formData = new FormData();
             formData.append('googleSheetUrl', url);
             formData.append('importType', importMode);
+            formData.append('smartMerge', smartMerge ? 'true' : 'false');
             if (profileId) formData.append('profileId', profileId);
 
             const res = await fetch('/api/excel-engine/import', {
@@ -81,6 +83,7 @@ export default function ExcelToolsPage() {
             const formData = new FormData();
             formData.append('file', file);
             formData.append('importType', importMode);
+            formData.append('smartMerge', smartMerge ? 'true' : 'false');
             if (profileId) formData.append('profileId', profileId);
 
             const res = await fetch('/api/excel-engine/import', {
@@ -108,7 +111,9 @@ export default function ExcelToolsPage() {
     const commitImport = async () => {
         if (!pendingFile && !googleSheetUrl) return;
 
-        const confirmText = 'Ghi dòng cảnh báo vào danh sách chính và đưa dòng trùng vào danh sách chờ kiểm tra riêng? Toàn bộ nguồn vẫn được giữ, không ghi đè lượt đã có.';
+        const confirmText = smartMerge
+            ? 'Xác nhận nhập dữ liệu? Dòng mới và các thông tin bổ sung sẽ được ghi vào hồ sơ nghiệp vụ. Dòng trùng hoàn toàn sẽ được tách riêng an toàn.'
+            : 'Ghi dòng cảnh báo vào danh sách chính và đưa dòng trùng vào danh sách chờ kiểm tra riêng? Toàn bộ nguồn vẫn được giữ, không ghi đè lượt đã có.';
 
         if (!window.confirm(confirmText)) return;
 
@@ -121,6 +126,7 @@ export default function ExcelToolsPage() {
                 data.append('file', pendingFile);
             }
             data.append('confirm', 'true');
+            data.append('smartMerge', smartMerge ? 'true' : 'false');
             data.append('importType', result?.detectedType || importMode);
 
             if (profileId) data.append('profileId', profileId);
@@ -239,6 +245,28 @@ export default function ExcelToolsPage() {
                         />
                     </div>
 
+                    {/* Tùy chọn Bổ sung thông tin còn thiếu (Smart Merge) */}
+                    <div className="mb-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        <div className="flex items-center justify-between">
+                            <Checkbox
+                                checked={smartMerge}
+                                onChange={(e) => setSmartMerge(e.target.checked)}
+                                className="text-xs font-semibold text-slate-800"
+                            >
+                                <span className="flex items-center gap-1.5">
+                                    <Layers className="w-3.5 h-3.5 text-blue-600"/>
+                                    Tự động bổ sung thông tin còn thiếu (Smart Merge)
+                                </span>
+                            </Checkbox>
+                            <Tag color={smartMerge ? 'blue' : 'default'} className="text-[10px] m-0 font-medium">
+                                {smartMerge ? 'Đang bật' : 'Tắt'}
+                            </Tag>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                            Nếu đợt tuyển đã có trong hệ thống nhưng file mới có thêm SĐT, Mã NV, Ngày đi làm, STK... hệ thống sẽ tự động điền bù vào các ô còn trống mà không ghi đè dữ liệu cũ.
+                        </p>
+                    </div>
+
                     {sourceMethod === 'FILE' ? (
                         <Dragger
                             name="file"
@@ -325,11 +353,16 @@ export default function ExcelToolsPage() {
                                     Kết Quả Xử Lý Dữ Liệu
                                 </h4>
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-center">
-                                  {[{label:'Tổng dòng',value:result.summary?.totalRows,color:'text-slate-800'},{label:result.preview?'Dòng nguồn sẽ được giữ':'Đã giữ dòng nguồn',value:result.preview?result.summary?.readyCount:result.summary?.successCount,color:'text-emerald-700'},{label:'Dòng có cảnh báo',value:result.summary?.warningCount||0,color:'text-amber-800'},{label:'Dòng trùng lặp',value:result.summary?.duplicateCount||0,color:'text-rose-700'}].map(item=><div key={item.label} className="bg-white p-3 rounded-lg"><div className={`text-sm ${item.color}`}>{item.label}</div><div className={`text-xl font-bold ${item.color}`}>{item.value}</div></div>)}
+                                  {[
+                                    {label:'Tổng dòng',value:result.summary?.totalRows,color:'text-slate-800'},
+                                    {label:result.preview?'Sẵn sàng nạp':'Đã ghi hồ sơ',value:result.preview?result.summary?.readyCount:result.summary?.successCount,color:'text-emerald-700'},
+                                    {label:'Bổ sung thông tin',value:result.summary?.mergedCount||0,color:'text-blue-700'},
+                                    {label:'Dòng trùng lặp',value:result.summary?.duplicateCount||0,color:'text-rose-700'}
+                                  ].map(item=><div key={item.label} className="bg-white p-3 rounded-lg"><div className={`text-sm ${item.color}`}>{item.label}</div><div className={`text-xl font-bold ${item.color}`}>{item.value}</div></div>)}
                                 </div>
                             </div>
 
-                            <p className="text-xs text-slate-600">Đếm theo số dòng. {result.mainSourceRows??0} dòng vào danh sách chính (bao gồm cảnh báo); {result.pendingDuplicateCount??0} dòng trùng vào danh sách chờ kiểm tra riêng. Dòng vừa cảnh báo vừa trùng đi theo luồng trùng.</p>
+                            <p className="text-xs text-slate-600">Đếm theo số dòng. {result.mainSourceRows??0} dòng vào danh sách chính (trong đó có {result.summary?.mergedCount??0} dòng bổ sung thông tin); {result.pendingDuplicateCount??0} dòng trùng hoàn toàn vào danh sách chờ kiểm tra riêng. Dòng vừa cảnh báo vừa trùng đi theo luồng trùng.</p>
                             {result.preview && (pendingFile || (sourceMethod === 'GOOGLE_SHEET' && googleSheetUrl)) && (
                                 <Button
                                     type="primary"

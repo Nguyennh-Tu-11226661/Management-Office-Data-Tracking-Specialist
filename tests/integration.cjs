@@ -67,6 +67,7 @@ const server = spawn(
   {
     env: {
       ...process.env,
+      LOCAL_DEMO_AUTO_VIEW: "0",
       LOCAL_BUILD_DIR:
         process.env.QA_PRODUCTION === "1" ? ".next-evolution" : ".next-qa",
       LOCAL_TEST_DATABASE_URL: "file:" + db,
