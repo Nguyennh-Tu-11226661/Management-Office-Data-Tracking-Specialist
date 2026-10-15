@@ -18,6 +18,7 @@ import {
   Descriptions,
   Tooltip,
   Alert,
+  Popconfirm,
 } from "antd";
 import {
   UserPlus,
@@ -30,6 +31,7 @@ import {
   Eye,
   RotateCcw,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 
 const FACTORIES = [
@@ -261,6 +263,34 @@ export default function WorkersPage() {
     setIsStatusModalOpen(true);
   };
 
+  // Xóa hồ sơ người lao động
+const handleDeleteWorker = async (record: any) => {
+    if (!record) return;
+    try {
+      const targetId = record.workerId || record.id;
+      const res = await fetch('/api/workers', {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workerId: targetId,
+          assignmentId: record.assignmentId || record.assignments?.[0]?.id,
+          idCard: record.idCard,
+          isSourceRow: record.isSourceRow,
+          sourceId: record.sourceId,
+          sourceRow: record.sourceRow,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        message.success("Đã xóa hồ sơ thành công");
+        fetchWorkers();
+      } else {
+        message.error(json.message || "Không thể xóa hồ sơ");
+      }
+    } catch {
+      message.error("Lỗi kết nối khi xóa");
+    }
+  };
   // Lưu cập nhật trạng thái
   const handleUpdateStatus = async (values: any) => {
     if (!selectedWorker) return;
@@ -566,7 +596,7 @@ export default function WorkersPage() {
     {
       title: "Thao tác",
       key: "actions",
-      width: 110,
+      width: 200,
       fixed: "right" as const,
       align: "center" as const,
       render: (_: any, record: any) => (
@@ -580,16 +610,37 @@ export default function WorkersPage() {
           >
             Xem
           </Button>
+
           {canWrite && (
-            <Button
-              type="text"
-              size="small"
-              className="text-slate-600 hover:text-slate-800 px-1"
-              icon={<Edit3 className="w-3.5 h-3.5 inline mr-0.5" />}
-              onClick={() => handleOpenStatusModal(record)}
-            >
-              Sửa
-            </Button>
+            <>
+              <Button
+                type="text"
+                size="small"
+                className="text-slate-600 hover:text-slate-800 px-1"
+                icon={<Edit3 className="w-3.5 h-3.5 inline mr-0.5" />}
+                onClick={() => handleOpenStatusModal(record)}
+              >
+                Sửa
+              </Button>
+
+              <Popconfirm
+                title="Xóa hồ sơ"
+                description="Bạn có chắc chắn muốn xóa hồ sơ này không?"
+                onConfirm={() => handleDeleteWorker(record)}
+                okText="Xóa"
+                cancelText="Hủy"
+                okButtonProps={{ danger: true }}
+              >
+                <Button
+                  type="text"
+                  size="small"
+                  className="text-red-600 hover:text-red-800 px-1"
+                  icon={<Trash2 className="w-3.5 h-3.5 inline mr-0.5" />}
+                >
+                  Xóa
+                </Button>
+              </Popconfirm>
+            </>
           )}
         </Space>
       ),
@@ -1326,7 +1377,7 @@ export default function WorkersPage() {
             </Form.Item>
 
             <Form.Item name="standardTrainingDate" label="Ngày Đào Tạo Chuẩn">
-              <Input placeholder="10/01/2026" />
+              <Input type="date" placeholder="10/01/2026" />
             </Form.Item>
 
             <Form.Item name="onboardingMonth" label="Tháng Nhận Việc">

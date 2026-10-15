@@ -17,7 +17,9 @@ import {
   ended,
   validateInterview,
 } from "@/lib/worker-validation";
+
 export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const denied = await guard(request);
   if (denied) return denied;
@@ -265,6 +267,81 @@ export async function POST(request: NextRequest) {
       return { status: 201, body: { success: true, data } };
     });
     return NextResponse.json(result.body, { status: result.status });
+  } catch (error: any) {
+    return resultError(error);
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const denied = await guard(request, "worker:write");
+  if (denied) return denied;
+
+  try {
+    const body = await request.json();
+    const actor = await identity(request);
+
+    let workerId = body.workerId;
+    let assignmentId = body.assignmentId || body.assignments?.[0]?.id;
+
+    // 1. Nếu chưa có workerId nhưng có idCard (CCCD), tìm kiếm worker trong DB Prisma
+    if (!workerId && body.idCard) {
+      const w = await prisma.worker.findUnique({
+        where: { idCard: body.idCard },
+        include: { assignments: true },
+      });
+      if (w) {
+        workerId = w.id;
+        if (!assignmentId && w.assignments.length > 0) {
+          assignmentId = w.assignments[0].id;
+        }
+      }
+    }
+
+    // 2. Tiến hành xóa trong Database Prisma nếu tồn tại bản ghi
+    if (workerId || assignmentId) {
+      await prisma.$transaction(async (tx) => {
+        if (assignmentId) {
+          await tx.bonusRecord.deleteMany({ where: { assignmentId } });
+          await tx.assignmentEvent.deleteMany({ where: { assignmentId } });
+          await tx.workAssignment.delete({ where: { id: assignmentId } });
+        }
+
+        if (workerId) {
+          const remaining = await tx.workAssignment.count({
+            where: { workerId },
+          });
+          if (remaining === 0) {
+            await tx.bankAccount.deleteMany({ where: { workerId } });
+            await tx.worker.delete({ where: { id: workerId } });
+          }
+        }
+
+        if (actor) {
+          await tx.auditLog.create({
+            data: {
+              module: "WORKER",
+              action: "DELETE",
+              operator: actor.username,
+              details: `Xóa hồ sơ worker:${workerId || ""} assignment:${assignmentId || ""}`,
+            },
+          });
+        }
+      });
+    } else {
+      // 3. Trường hợp dòng dữ liệu nguồn import chưa vào DB: Ghi audit log xóa
+      if (actor) {
+        await prisma.auditLog.create({
+          data: {
+            module: "WORKER",
+            action: "DELETE",
+            operator: actor.username,
+            details: `Xóa dòng dữ liệu nguồn import CCCD: ${body.idCard || "N/A"}`,
+          },
+        });
+      }
+    }
+
+    return NextResponse.json({ success: true, message: "Đã xóa hồ sơ thành công" });
   } catch (error: any) {
     return resultError(error);
   }
