@@ -23,13 +23,19 @@ import {
 
 const pct = (n: number | null | undefined) => (n == null ? '—' : `${n}%`);
 
-const isPassed = (a: any) =>
-  a.interviewResult === 'PASS' ||
-  ['Đang làm việc', 'Đạt phỏng vấn', 'Đang đào tạo', 'Đã nghỉ việc', 'Chuyển chính thức'].includes(a.status);
+const isPassed = (a: any) => {
+  if (a.interviewResult === 'PASS') return true;
+  const s = String(a.status || '').trim().toLowerCase();
+  if (['lv', 'đang làm việc', 'chuyển chính thức', 'đang lv', 'đang đào tạo'].includes(s)) return true;
+  if (['nh', 'nghỉ hẳn', 'hết phí', 'hhđ', 'hết hợp đồng', 'tự ý nghỉ việc', 'đã nghỉ việc', 'đạt phỏng vấn', 'đỗ - ko tính', 'gtnb'].includes(s)) return true;
+  return false;
+};
 
-const isWorking = (a: any) =>
-  ['Đang làm việc', 'Chuyển chính thức'].includes(a.status) ||
-  (a.confirmedWorkDays != null && a.confirmedWorkDays >= 10);
+const isWorking = (a: any) => {
+  const s = String(a.status || '').trim().toLowerCase();
+  return ['lv', 'đang làm việc', 'chuyển chính thức', 'đang lv'].includes(s) ||
+    (a.confirmedWorkDays != null && a.confirmedWorkDays >= 10);
+};
 
 const dateKey = (value: string): string | null => {
   if (!value) return null;

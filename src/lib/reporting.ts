@@ -24,15 +24,16 @@ export function matchesAssignment(a: any, p: URLSearchParams) {
       ].some((v) => v?.toLowerCase().includes(search)))
   );
 }
-const worked = (a: any) =>
-  !!a.startDate ||
-  [
-    "Đang làm việc",
-    "Đã nghỉ việc",
-    "Nghỉ hẳn",
-    "Hết hợp đồng",
-    "Chuyển chính thức",
-  ].includes(a.status);
+const worked = (a: any) => {
+  if (!!a.startDate) return true;
+  const s = String(a.status || "").trim().toLowerCase();
+  return (
+    [
+      "lv", "đang làm việc", "chuyển chính thức", "đang lv",
+      "nh", "nghỉ hẳn", "hết phí", "hhđ", "hết hợp đồng", "tự ý nghỉ việc", "đã nghỉ việc"
+    ].includes(s) || (a.confirmedWorkDays != null && a.confirmedWorkDays > 0)
+  );
+};
 export function recruitmentReport(workers: any[], p: URLSearchParams) {
   const all = workers
     .filter((w) => !w.archivedAt)
@@ -67,27 +68,33 @@ export function recruitmentReport(workers: any[], p: URLSearchParams) {
     );
   }
   function summarize(list: any[]) {
-    const isPassed = (a: any) =>
-      a.interviewResult === "PASS" ||
-      [
-        "Đang làm việc",
-        "Đạt phỏng vấn",
-        "Đang đào tạo",
-        "Đã nghỉ việc",
-        "Chuyển chính thức",
-      ].includes(a.status);
-    const isFailed = (a: any) =>
-      a.interviewResult === "FAIL" || a.status === "Trượt phỏng vấn";
-    const isAbandon = (a: any) =>
-      a.interviewResult === "ABANDONED" || a.status.startsWith("Bỏ");
+    const isPassed = (a: any) => {
+      if (a.interviewResult === "PASS") return true;
+      const s = String(a.status || "").trim().toLowerCase();
+      if (["lv", "đang làm việc", "chuyển chính thức", "đang lv", "đang đào tạo"].includes(s)) return true;
+      if (["nh", "nghỉ hẳn", "hết phí", "hhđ", "hết hợp đồng", "tự ý nghỉ việc", "đã nghỉ việc", "đạt phỏng vấn", "đỗ - ko tính", "gtnb"].includes(s)) return true;
+      return false;
+    };
+    const isWorking = (a: any) => {
+      const s = String(a.status || "").trim().toLowerCase();
+      return ["lv", "đang làm việc", "chuyển chính thức", "đang lv"].includes(s);
+    };
+    const isFailed = (a: any) => {
+      if (a.interviewResult === "FAIL") return true;
+      const s = String(a.status || "").trim().toLowerCase();
+      return s.startsWith("trượt") || s.includes("trượt ksk") || s.includes("trượt pv");
+    };
+    const isAbandon = (a: any) => {
+      if (a.interviewResult === "ABANDONED") return true;
+      const s = String(a.status || "").trim().toLowerCase();
+      return s.startsWith("bỏ") || s.includes("bỏ xx") || s.includes("bỏ đt");
+    };
     const total = list.length,
       passed = list.filter(isPassed).length,
       failed = list.filter(isFailed).length;
     const abandon = list.filter(isAbandon).length;
-    const working = list.filter((a) =>
-      ["Đang làm việc", "Chuyển chính thức"].includes(a.status),
-    ).length;
-    const training = list.filter((a) => a.status === "Đang đào tạo").length;
+    const working = list.filter(isWorking).length;
+    const training = list.filter((a) => String(a.status || "").toLowerCase().includes("đào tạo")).length;
     const returned = list.filter((a) => returning(a)).length;
     return {
       total,

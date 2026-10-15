@@ -224,6 +224,33 @@ export async function POST(request: NextRequest) {
       const workers = await prisma.worker.findMany({ include: { assignments: true } });
       const workerMap = new Map(workers.map(w => [w.idCard, w]));
 
+      const existingBonuses = await prisma.bonusRecord.findMany({
+        select: {
+          id: true,
+          workerId: true,
+          month: true,
+          company: true,
+          assignmentId: true,
+          bonus1: true,
+          bonus2: true,
+          bonus3: true,
+          bonus4: true,
+          bonus5: true,
+          bonus6: true,
+          bonus7: true,
+          totalBonus: true,
+          policy: true,
+          workerCode: true,
+          interviewDate: true,
+        }
+      });
+      const bonusMap = new Map<string, typeof existingBonuses[0]>();
+      for (const b of existingBonuses) {
+        bonusMap.set(`${b.workerId}|${b.month}|${b.company || ''}|${b.assignmentId || ''}`, b);
+        bonusMap.set(`${b.workerId}|${b.month}|${b.company || ''}|`, b);
+      }
+
+      const seenInFile = new Map<string, number>();
       const commitTasks: Array<(tx: any) => Promise<void>> = [];
 
       for (const e of entries) {
@@ -240,6 +267,15 @@ export async function POST(request: NextRequest) {
           const workerCode = String(raw['Mã nhân viên'] || raw['Mã NV'] || '').trim();
           const stk = raw['STK'] ? String(raw['STK']).trim() : '';
           const bankName = raw['Ngân hàng'] ? String(raw['Ngân hàng']).trim() : '';
+
+          // 1. Kiểm tra trùng lặp nội bộ trong file
+          const fileKey = `${idCard}|${month}|${company}`;
+          if (seenInFile.has(fileKey)) {
+            duplicateCount++;
+            errors.push(`Dòng ${e.row}: Trùng lặp nội bộ file với dòng ${seenInFile.get(fileKey)} (cùng CCCD ${idCard}, tháng ${month}, công ty ${company}).`);
+            continue;
+          }
+          seenInFile.set(fileKey, e.row);
 
           const parseBonus = sourceRewardAmount;
           const bonus1 = parseBonus(raw['Thưởng lần 1']);
@@ -268,84 +304,104 @@ export async function POST(request: NextRequest) {
             selectedAssignment = exactDate || candidates[0];
           }
           if (!selectedAssignment) throw new Error('Không xác định duy nhất đợt theo CCCD, công ty, ngày PV và mã NV');
+
+          // 2. Kiểm tra bản thưởng đã có trong CSDL (Smart Merge hoặc Tách trùng an toàn)
+          const bonusKey = `${worker.id}|${month}|${company}|${selectedAssignment.id}`;
+          const existingBonus = bonusMap.get(bonusKey) || bonusMap.get(`${worker.id}|${month}|${company}|`);
+
+          if (existingBonus) {
+            // Kiểm tra xem có lần thưởng nào mới để bổ sung (Smart Merge) hay không
+            const bonusKeys: Array<'bonus1' | 'bonus2' | 'bonus3' | 'bonus4' | 'bonus5' | 'bonus6' | 'bonus7'> = [
+              'bonus1', 'bonus2', 'bonus3', 'bonus4', 'bonus5', 'bonus6', 'bonus7'
+            ];
+            const newBonusValues = [bonus1, bonus2, bonus3, bonus4, bonus5, bonus6, bonus7];
+            const bonusUpdates: Record<string, number> = {};
+            let hasNewBonus = false;
+
+            bonusKeys.forEach((key, idx) => {
+              const oldVal = (existingBonus as any)[key] || 0;
+              const newVal = newBonusValues[idx] || 0;
+              if (oldVal === 0 && newVal > 0) {
+                bonusUpdates[key] = newVal;
+                hasNewBonus = true;
+              }
+            });
+
+            if (smartMerge && hasNewBonus) {
+              if (commit) {
+                commitTasks.push(async (tx) => {
+                  const addedAmount = Object.values(bonusUpdates).reduce((a, b) => a + b, 0);
+                  await tx.bonusRecord.update({
+                    where: { id: existingBonus.id },
+                    data: {
+                      ...bonusUpdates,
+                      totalBonus: (existingBonus.totalBonus || 0) + addedAmount,
+                      policy: policy || existingBonus.policy,
+                      workerCode: workerCode || existingBonus.workerCode,
+                      interviewDate: interviewDate || existingBonus.interviewDate,
+                    }
+                  });
+                  await tx.auditLog.create({
+                    data: {
+                      module: 'BONUS',
+                      action: 'UPDATE',
+                      operator: actor.username,
+                      details: `Dòng ${e.row}: Bổ sung thưởng đợt ${month} cho CCCD ${idCard} (${company})`
+                    }
+                  });
+                });
+              } else {
+                readyCount++;
+              }
+              mergedCount++;
+              continue;
+            }
+
+            // Nếu không có thông tin mới để bổ sung: Tách riêng vào luồng trùng, KHÔNG throw làm hỏng các dòng khác
+            duplicateCount++;
+            errors.push(`Dòng ${e.row}: Bản thưởng của đợt đã có; không tự ghi đè`);
+            continue;
+          }
+
+          // 3. Nếu là bản ghi mới hợp lệ:
+          bonusMap.set(bonusKey, { id: 'temp', workerId: worker.id, month, company, assignmentId: selectedAssignment.id } as any);
           const sourceNote=JSON.stringify({source:'SOURCE_EXCEL_ACTUAL_PAID',monthOriginal:raw['Tháng'],sourceValues:raw,rewards:Array.from({length:7},(_,i)=>String(raw['Thưởng lần '+(i+1)]||'')),paymentDate:null,reference:null});
 
           if (commit) {
             commitTasks.push(async (tx) => {
-              if (!worker) {
-                worker = await tx.worker.create({
-                  data: {
-                    idCard,
-                    fullName: fullName || 'Người lao động',
-                    code: workerCode || null,
-                  },
-                  include: { assignments: true }
-                });
-                workerMap.set(idCard, worker);
-              }
-
-              const assignmentId=selectedAssignment.id;
-              const existingBonus = await tx.bonusRecord.findFirst({
-                where: {
-                  workerId: worker.id,
+              const assignmentId = selectedAssignment!.id;
+              await tx.bonusRecord.create({
+                data: {
+                  workerId: worker!.id,
+                  assignmentId,
+                  company,
                   month,
-                  company: company || undefined, assignmentId
+                  interviewDate,
+                  policy,
+                  workerCode,
+                  bonus1,
+                  bonus2,
+                  bonus3,
+                  bonus4,
+                  bonus5,
+                  bonus6,
+                  bonus7,
+                  totalBonus,
+                  status: 'DRAFT',
+                  note: sourceNote
                 }
               });
 
-              if(existingBonus)throw new Error('Bản thưởng của đợt đã có; không tự ghi đè');
-              if (existingBonus) {
-                await tx.bonusRecord.update({
-                  where: { id: existingBonus.id },
-                  data: {
-                    interviewDate: interviewDate || existingBonus.interviewDate,
-                    policy: policy || existingBonus.policy,
-                    workerCode: workerCode || existingBonus.workerCode,
-                    bonus1,
-                    bonus2,
-                    bonus3,
-                    bonus4,
-                    bonus5,
-                    bonus6,
-                    bonus7,
-                    totalBonus,
-                    status: 'DRAFT', note: sourceNote,
-                    assignmentId: assignmentId || existingBonus.assignmentId
-                  }
-                });
-              } else {
-                await tx.bonusRecord.create({
-                  data: {
-                    workerId: worker.id,
-                    assignmentId,
-                    company,
-                    month,
-                    interviewDate,
-                    policy,
-                    workerCode,
-                    bonus1,
-                    bonus2,
-                    bonus3,
-                    bonus4,
-                    bonus5,
-                    bonus6,
-                    bonus7,
-                    totalBonus,
-                    status: 'DRAFT', note: sourceNote
-                  }
-                });
-              }
-
               if (stk) {
                 const existingBank = await tx.bankAccount.findFirst({
-                  where: { workerId: worker.id }
+                  where: { workerId: worker!.id }
                 });
                 if (!existingBank) {
                   await tx.bankAccount.create({
                     data: {
-                      workerId: worker.id,
+                      workerId: worker!.id,
                       accountNumber: stk,
-                      accountHolderName: fullName || worker.fullName,
+                      accountHolderName: fullName || worker!.fullName,
                       bankName: bankName || 'Ngân hàng đối soát',
                       verificationStatus: 'UNVERIFIED',
                       isNameVerified: false,
@@ -395,7 +451,7 @@ export async function POST(request: NextRequest) {
         detectedType: 'DS_THUONG',
         detectedTypeName: 'Bảng thưởng các lần 1 → 7 (DS_THUONG)',
         sheetUsed: targetSheetName,
-        summary: { totalRows: entries.length, successCount:commit?successCount:0, readyCount:commit?0:readyCount, duplicateCount:duplicateCount||review.duplicateRows, errorCount, warningCount:review.warningRows, cleanCount:entries.length-review.reviewRows, rehireCount }, normalizationErrors:errors,
+        summary: { totalRows: entries.length, successCount:commit?successCount:0, readyCount:commit?0:readyCount, duplicateCount:duplicateCount||review.duplicateRows, errorCount, warningCount:review.warningRows, cleanCount:entries.length-review.reviewRows, rehireCount, mergedCount }, normalizationErrors:errors,
         errors,
         warnings:review.warnings.map(i=>i.message), duplicates:review.duplicates.map(i=>i.message)
       });
@@ -458,7 +514,6 @@ export async function POST(request: NextRequest) {
                 }
               });
 
-              if(existingBank)throw new Error('STK trùng hồ sơ đã có — giữ riêng chờ kiểm tra');
               if (existingBank) {
                 await tx.bankAccount.update({
                   where: { id: existingBank.id },
