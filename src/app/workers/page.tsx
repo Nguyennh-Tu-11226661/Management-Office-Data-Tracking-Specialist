@@ -293,8 +293,7 @@ export default function WorkersPage() {
       }
       for (const key of keys) {
         const value = v[key];
-        if (value !== undefined && value !== null && value !== "")
-          return value;
+        if (value !== undefined && value !== null && value !== "") return value;
       }
       return "";
     };

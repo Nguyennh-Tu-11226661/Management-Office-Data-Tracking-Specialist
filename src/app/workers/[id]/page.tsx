@@ -391,7 +391,7 @@ export default function WorkerDetailPage() {
               leaveReason: "Lý do nghỉ",
             }).map(([name, label]) => (
               <Form.Item key={name} name={name} label={label}>
-                { [
+                {[
                   "dob",
                   "idCardDate",
                   "interviewDate",
