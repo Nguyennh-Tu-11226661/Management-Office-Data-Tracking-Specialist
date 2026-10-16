@@ -53,16 +53,39 @@ export default function OverviewPage() {
   const [data, setData] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [catalogs, setCatalogs] = useState<any[]>([]);
-  const [filters, setFilters] = useState<Record<string, string>>({});
+
+  // Đổi kiểu dữ liệu sang Record<string, any> để chấp nhận mảng string[]
+  const [filters, setFilters] = useState<Record<string, any>>({
+    month: "",
+    from: "",
+    to: "",
+    interviewFactory: [], // Mảng multi-select
+    orderId: [], // Mảng multi-select
+    batchId: [], // Mảng multi-select
+  });
+
   const [busy, setBusy] = useState(false);
   const [tableSearch, setTableSearch] = useState("");
 
   async function load() {
     setBusy(true);
     try {
-      const q = new URLSearchParams(filters).toString();
-      const res = await fetch(`/api/reports?${q}`);
+      const params = new URLSearchParams();
+
+      // Duyệt qua từng key trong filters để build URLSearchParams chuẩn
+      Object.entries(filters).forEach(([key, val]) => {
+        if (Array.isArray(val)) {
+          if (val.length > 0) {
+            params.append(key, val.join(","));
+          }
+        } else if (val !== undefined && val !== null && val !== "") {
+          params.append(key, String(val));
+        }
+      });
+
+      const res = await fetch(`/api/reports?${params.toString()}`);
       const j = await res.json();
+
       if (j.success) {
         setData(j.data);
       } else {
@@ -93,10 +116,20 @@ export default function OverviewPage() {
     return () => clearInterval(timer);
   }, [filters]);
 
-  const set = (key: string, value: string) =>
-    setFilters((old) => ({ ...old, [key]: value || "" }));
+  // 1. Cập nhật hàm set để nhận cả string và mảng string[]
+  const set = (key: string, value: any) =>
+    setFilters((old) => ({ ...old, [key]: value ?? "" }));
 
-  const clearFilters = () => setFilters({});
+  // 2. Cập nhật hàm clearFilters để reset về mảng rỗng cho các trường multi-select
+  const clearFilters = () =>
+    setFilters({
+      month: "",
+      from: "",
+      to: "",
+      interviewFactory: [],
+      orderId: [],
+      batchId: [],
+    });
 
   const factoryNames = [
     ...new Set([
@@ -567,73 +600,154 @@ export default function OverviewPage() {
             />
           </div>
 
-          {/* 4. Nhà máy */}
+          {/* 4. Nhà máy (Hỗ trợ Multi-Select + Chọn tất cả) */}
           <div>
             <label
               htmlFor="filter-factory"
               className="block text-xs font-semibold text-slate-600 mb-1.5"
             >
-              Nhà máy phỏng vấn
+              Nhà máy phỏng vấn (Chọn nhiều)
             </label>
             <Select
               id="filter-factory"
+              mode="multiple"
+              maxTagCount="responsive"
               className="w-full"
               allowClear
               placeholder="Tất cả nhà máy"
-              value={filters.interviewFactory || undefined}
-              onChange={(v) => set("interviewFactory", v)}
-              options={factoryNames.map((f) => ({ value: f, label: f }))}
+              value={
+                Array.isArray(filters.interviewFactory)
+                  ? filters.interviewFactory
+                  : []
+              }
+              onChange={(selectedValues) => {
+                const allList = factoryNames || [];
+                if (selectedValues.includes("ALL")) {
+                  const currentList = Array.isArray(filters.interviewFactory)
+                    ? filters.interviewFactory
+                    : [];
+                  if (currentList.length === allList.length) {
+                    set("interviewFactory", []);
+                  } else {
+                    set("interviewFactory", allList);
+                  }
+                } else {
+                  set("interviewFactory", selectedValues);
+                }
+              }}
+              options={[
+                { value: "ALL", label: "--- Chọn tất cả ---" },
+                ...(factoryNames || []).map((f) => ({ value: f, label: f })),
+              ]}
             />
           </div>
 
-          {/* 5. Đơn hàng */}
+          {/* 5. Đơn hàng (Hỗ trợ Multi-Select + Chọn tất cả) */}
           <div>
             <label
               htmlFor="filter-order"
               className="block text-xs font-semibold text-slate-600 mb-1.5"
             >
-              Đơn hàng tuyển dụng
+              Đơn hàng tuyển dụng (Chọn nhiều)
             </label>
             <Select
               id="filter-order"
+              mode="multiple"
+              maxTagCount="responsive"
               className="w-full"
               allowClear
               popupMatchSelectWidth={false}
               placeholder="Tất cả đơn hàng"
-              value={filters.orderId || undefined}
-              onChange={(v) => {
-                set("orderId", v);
-                set("batchId", "");
+              value={Array.isArray(filters.orderId) ? filters.orderId : []}
+              onChange={(selectedValues) => {
+                const allList = orders.map((o) => o.id);
+                if (selectedValues.includes("ALL")) {
+                  const currentList = Array.isArray(filters.orderId)
+                    ? filters.orderId
+                    : [];
+                  if (currentList.length === allList.length) {
+                    set("orderId", []);
+                  } else {
+                    set("orderId", allList);
+                  }
+                } else {
+                  set("orderId", selectedValues);
+                }
+                set("batchId", []); // Reset đợt tuyển khi đổi đơn hàng
               }}
-              options={orders.map((o) => ({ value: o.id, label: o.name }))}
+              options={[
+                { value: "ALL", label: "--- Chọn tất cả ---" },
+                ...orders.map((o) => ({ value: o.id, label: o.name })),
+              ]}
             />
           </div>
         </div>
 
         {/* Hàng phụ: Đợt tuyển & Active Filters */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-100">
-          <div className="flex items-center gap-2 max-w-md w-full">
+          <div className="flex items-center gap-2 max-w-xl w-full">
             <span className="text-xs font-semibold text-slate-600 shrink-0">
-              Đợt tuyển:
+              Đợt tuyển (Chọn nhiều):
             </span>
             <Select
               id="filter-batch"
+              mode="multiple"
+              maxTagCount="responsive"
               className="w-full"
               allowClear
               popupMatchSelectWidth={false}
               placeholder="Tất cả đợt tuyển (T01 - T10)"
-              value={filters.batchId || undefined}
-              onChange={(v) => set("batchId", v)}
-              options={orders
-                .filter((o) => !filters.orderId || o.id === filters.orderId)
-                .flatMap((o) =>
-                  o.batches.map((b: any) => ({
-                    value: b.id,
-                    label: filters.orderId
-                      ? `${b.periodMonth || b.name} (Chỉ tiêu: ${b.target ? b.target.toLocaleString("vi-VN") : "N/A"})`
-                      : `${o.factory} · ${b.periodMonth || b.name} (Chỉ tiêu: ${b.target ? b.target.toLocaleString("vi-VN") : "N/A"})`,
-                  })),
-                )}
+              value={Array.isArray(filters.batchId) ? filters.batchId : []}
+              onChange={(selectedValues) => {
+                const availableBatches = orders
+                  .filter((o) => {
+                    const selectedOrders = Array.isArray(filters.orderId)
+                      ? filters.orderId
+                      : [];
+                    return (
+                      selectedOrders.length === 0 ||
+                      selectedOrders.includes(o.id)
+                    );
+                  })
+                  .flatMap((o) => o.batches.map((b: any) => b.id));
+
+                if (selectedValues.includes("ALL")) {
+                  const currentList = Array.isArray(filters.batchId)
+                    ? filters.batchId
+                    : [];
+                  if (currentList.length === availableBatches.length) {
+                    set("batchId", []);
+                  } else {
+                    set("batchId", availableBatches);
+                  }
+                } else {
+                  set("batchId", selectedValues);
+                }
+              }}
+              options={(() => {
+                const selectedOrders = Array.isArray(filters.orderId)
+                  ? filters.orderId
+                  : [];
+                const batchOptions = orders
+                  .filter(
+                    (o) =>
+                      selectedOrders.length === 0 ||
+                      selectedOrders.includes(o.id),
+                  )
+                  .flatMap((o) =>
+                    o.batches.map((b: any) => ({
+                      value: b.id,
+                      label:
+                        selectedOrders.length === 1
+                          ? `${b.periodMonth || b.name} (Chỉ tiêu: ${b.target ? b.target.toLocaleString("vi-VN") : "N/A"})`
+                          : `${o.factory} · ${b.periodMonth || b.name} (Chỉ tiêu: ${b.target ? b.target.toLocaleString("vi-VN") : "N/A"})`,
+                    })),
+                  );
+                return [
+                  { value: "ALL", label: "--- Chọn tất cả ---" },
+                  ...batchOptions,
+                ];
+              })()}
             />
           </div>
 
@@ -648,7 +762,9 @@ export default function OverviewPage() {
                 <Tag
                   key={f.key}
                   closable
-                  onClose={() => set(f.key, "")}
+                  onClose={() =>
+                    set(f.key, Array.isArray(filters[f.key]) ? [] : "")
+                  }
                   color="blue"
                   className="text-xs py-0.5 px-2 rounded-md"
                 >

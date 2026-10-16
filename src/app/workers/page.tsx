@@ -36,7 +36,6 @@ import {
   ExternalLink,
   Trash2,
 } from "lucide-react";
-
 const FACTORIES = [
   "Luxshare QC",
   "Canon",
@@ -278,27 +277,81 @@ export default function WorkersPage() {
   // Mở modal cập nhật trạng thái
   const handleOpenStatusModal = (worker: any) => {
     setSelectedWorker(worker);
-    const assignment = worker.assignments?.[0];
+    const assignment = worker.assignments?.[0] || {};
+    const v = worker.sourceValues || {};
+
     statusForm.resetFields();
+
+    // Prefer persisted values; use imported source values only as a fallback.
+    const getVal = (...keys: string[]) => {
+      for (const record of [assignment, worker.workerValues, worker]) {
+        for (const key of keys) {
+          const value = record?.[key];
+          if (value !== undefined && value !== null && value !== "")
+            return value;
+        }
+      }
+      for (const key of keys) {
+        const value = v[key];
+        if (value !== undefined && value !== null && value !== "")
+          return value;
+      }
+      return "";
+    };
+
     statusForm.setFieldsValue({
-      fullName: worker.sourceValues?.["Họ và tên"] || worker.fullName,
-      idCard: worker.sourceValues?.["Số CCCD"] || worker.idCard,
-      phone: worker.sourceValues?.["SĐT"] || worker.phone,
-      ...worker,
-      ...assignment,
-      status:
-        worker.sourceValues?.["Tình trạng"] ||
-        assignment?.status ||
-        "Đang làm việc",
-      leaveDate:
-        worker.sourceValues?.["Ngày NH"] || assignment?.leaveDate || "",
-      leaveReason:
-        worker.sourceValues?.["Lý do"] || assignment?.leaveReason || "",
-      workingFactory:
-        worker.sourceValues?.["Nhà máy làm việc"] ||
-        assignment?.workingFactory ||
-        assignment?.interviewFactory,
+      orderId: getVal("orderId"),
+      batchId: getVal("batchId"),
+      employeeCode: getVal("employeeCode", "Mã nhân viên", "Mã NV"),
+      recruiterId: getVal("recruiterId"),
+      teamId: getVal("teamId"),
+      interviewResult: getVal("interviewResult", "Kết quả phỏng vấn"),
+      passedDate: getVal("passedDate", "Ngày đỗ", "Ngày phỏng vấn đỗ"),
+      startDate: getVal("startDate", "Ngày bắt đầu làm (sau ngày đỗ)"),
+      confirmedWorkDays: getVal(
+        "confirmedWorkDays",
+        "Số công thực tế đã xác nhận",
+      ),
+      workDaysAsOf: getVal("workDaysAsOf", "Ngày chốt số công"),
+
+      fullName: getVal("fullName", "Họ và tên"),
+      phone: getVal("phone", "Số điện thoại", "SĐT"),
+      dob: getVal("dob", "Ngày sinh"),
+      gender: getVal("gender", "Giới tính"),
+      code: getVal("code", "Mã hồ sơ"),
+      idCardDate: getVal("idCardDate", "Ngày cấp CCCD", "Ngày cấp"),
+      idCardPlace: getVal("idCardPlace", "Nơi cấp"),
+      address: getVal("address", "Địa chỉ / Quê quán", "Địa chỉ"),
+      province: getVal("province", "Tỉnh/Thành"),
+      recruiter: getVal("recruiter", "Chuyên viên tuyển dụng", "Tuyển dụng"),
+      team: getVal("team", "Team phụ trách", "Đội nhóm"),
+      source: getVal("source", "Nguồn"),
+
+      interviewFactory: getVal("interviewFactory", "Nhà máy PV"),
+      workingFactory: getVal("workingFactory", "Nhà máy làm việc"),
+      contractType: getVal("contractType", "Loại hợp đồng", "Loại HĐ"),
+      shuttleBusKtx: getVal("shuttleBusKtx", "Đón xe + KTX", "Đón xe / KTX"),
+      interviewDate: getVal("interviewDate", "Ngày PV", "Ngày phỏng vấn"),
+      expectedTrainingDate: getVal(
+        "expectedTrainingDate",
+        "Ngày Đào tạo dự kiến",
+        "Ngày đào tạo dự kiến",
+      ),
+      expectedTrainingStatus: getVal(
+        "expectedTrainingStatus",
+        "Tình trạng đào tạo",
+      ),
+      standardTrainingDate: getVal(
+        "standardTrainingDate",
+        "Ngày đào tạo chuẩn",
+        "Ngày ĐT chuẩn",
+      ),
+      onboardingMonth: getVal("onboardingMonth", "Tháng nhận việc"),
+      status: getVal("status", "Tình trạng") || "Đang chờ phỏng vấn",
+      leaveDate: getVal("leaveDate", "Ngày nghỉ việc (Ngày NH)", "Ngày NH"),
+      leaveReason: getVal("leaveReason", "Lý do nghỉ việc", "Lý do"),
     });
+
     setIsStatusModalOpen(true);
   };
 
@@ -1548,7 +1601,7 @@ export default function WorkersPage() {
                 label={
                   (
                     {
-                      code: "Mã NV",
+                      code: "Mã hồ sơ",
                       idCardDate: "Ngày cấp",
                       idCardPlace: "Nơi cấp",
                       province: "Tỉnh/Thành",
@@ -1600,7 +1653,7 @@ export default function WorkersPage() {
               phone: "SĐT",
               dob: "Ngày sinh",
               gender: "Giới tính",
-              code: "Mã NV",
+              code: "Mã hồ sơ",
               idCardDate: "Ngày cấp",
               idCardPlace: "Nơi cấp",
               address: "Địa chỉ",

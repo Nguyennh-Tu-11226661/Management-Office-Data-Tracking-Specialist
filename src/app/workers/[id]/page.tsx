@@ -54,6 +54,8 @@ export default function WorkerDetailPage() {
           "phone",
           "dob",
           "gender",
+          "idCardDate",
+          "idCardPlace",
           "address",
           "province",
           "code",
@@ -368,17 +370,35 @@ export default function WorkerDetailPage() {
               phone: "SĐT",
               dob: "Ngày sinh",
               gender: "Giới tính",
+              idCardDate: "Ngày cấp",
+              idCardPlace: "Nơi cấp",
               province: "Quê quán/Tỉnh",
               address: "Địa chỉ",
               code: "Mã hồ sơ",
+              recruiter: "Tuyển dụng",
+              team: "Đội nhóm",
+              source: "Nguồn tuyển dụng",
               interviewFactory: "Nhà máy PV",
               workingFactory: "Nhà máy làm việc",
+              contractType: "Loại hợp đồng",
+              shuttleBusKtx: "Đón xe / KTX",
               interviewDate: "Ngày PV",
+              expectedTrainingDate: "Ngày đào tạo dự kiến",
+              expectedTrainingStatus: "Tình trạng đào tạo",
+              standardTrainingDate: "Ngày đào tạo chuẩn",
+              onboardingMonth: "Tháng nhận việc",
               leaveDate: "Ngày nghỉ",
               leaveReason: "Lý do nghỉ",
             }).map(([name, label]) => (
               <Form.Item key={name} name={name} label={label}>
-                {["dob", "interviewDate", "leaveDate"].includes(name) ? (
+                { [
+                  "dob",
+                  "idCardDate",
+                  "interviewDate",
+                  "expectedTrainingDate",
+                  "standardTrainingDate",
+                  "leaveDate",
+                ].includes(name) ? (
                   <DateField />
                 ) : (
                   <Input />

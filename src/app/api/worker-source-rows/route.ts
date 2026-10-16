@@ -37,6 +37,50 @@ export async function GET(request: NextRequest) {
     ]);
 
     const people = new Map(workers.map((w) => [w.idCard, w]));
+    const assignmentValues = (a: any) => ({
+      id: a.id,
+      updatedAt: a.updatedAt,
+      contractType: a.contractType,
+      status: a.status,
+      interviewFactory: a.interviewFactory,
+      workingFactory: a.workingFactory,
+      leaveDate: a.leaveDate,
+      leaveReason: a.leaveReason,
+      shuttleBusKtx: a.shuttleBusKtx,
+      interviewDate: a.interviewDate,
+      expectedTrainingDate: a.expectedTrainingDate,
+      expectedTrainingStatus: a.expectedTrainingStatus,
+      standardTrainingDate: a.standardTrainingDate,
+      onboardingMonth: a.onboardingMonth,
+      employeeCode: a.employeeCode,
+      recruiter: a.recruiter,
+      recruiterId: a.recruiterId,
+      team: a.team,
+      teamId: a.teamId,
+      orderId: a.orderId,
+      batchId: a.batchId,
+      interviewResult: a.interviewResult,
+      passedDate: a.passedDate,
+      startDate: a.startDate,
+      confirmedWorkDays: a.confirmedWorkDays,
+      workDaysAsOf: a.workDaysAsOf,
+      source: a.source,
+    });
+    const workerValues = (w: any) => ({
+      code: w.code,
+      fullName: w.fullName,
+      dob: w.dob,
+      gender: w.gender,
+      idCard: w.idCard,
+      idCardDate: w.idCardDate,
+      idCardPlace: w.idCardPlace,
+      phone: w.phone,
+      address: w.address,
+      province: w.province,
+      recruiter: w.recruiter,
+      team: w.team,
+      source: w.source,
+    });
 
     const bonusRows = sources
       .filter((s) => s.type === "DS_THUONG")
@@ -86,18 +130,7 @@ export async function GET(request: NextRequest) {
           ...(r.duplicates || []),
         ]);
         const cleanAssignments = worker
-          ? worker.assignments.map((a: any) => ({
-              id: a.id,
-              contractType: a.contractType,
-              status: a.status,
-              interviewFactory: a.interviewFactory,
-              workingFactory: a.workingFactory,
-              leaveDate: a.leaveDate,
-              leaveReason: a.leaveReason,
-              employeeCode: a.employeeCode,
-              recruiter: a.recruiter,
-              team: a.team,
-            }))
+          ? worker.assignments.map(assignmentValues)
           : [];
         const cleanBanks = worker?.bankAccounts
           ? worker.bankAccounts.map((b: any) => ({
@@ -116,6 +149,8 @@ export async function GET(request: NextRequest) {
           workerId: worker?.id,
           fullName: values["Họ và tên"],
           idCard: card,
+          updatedAt: worker?.updatedAt,
+          workerValues: worker ? workerValues(worker) : null,
           assignments: cleanAssignments,
           bankAccounts: cleanBanks,
           isSourceRow: true,
@@ -153,18 +188,11 @@ export async function GET(request: NextRequest) {
             phone: w.phone,
             assignments: [
               {
-                id: a.id,
-                contractType: a.contractType,
-                status: a.status,
-                interviewFactory: a.interviewFactory,
-                workingFactory: a.workingFactory,
-                leaveDate: a.leaveDate,
-                leaveReason: a.leaveReason,
-                employeeCode: a.employeeCode,
-                recruiter: a.recruiter,
-                team: a.team,
+                ...assignmentValues(a),
               },
             ],
+            updatedAt: w.updatedAt,
+            workerValues: workerValues(w),
             assignmentCount: w.assignments.length,
             bankAccounts: w.bankAccounts
               ? w.bankAccounts.map((b: any) => ({
