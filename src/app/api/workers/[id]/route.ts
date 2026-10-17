@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   assignmentRelations,
+  assignmentEnded,
   resultError,
   today,
   day,
@@ -14,7 +15,6 @@ import {
   cleanFields,
   validateWorker,
   phoneKey,
-  ended,
   validateInterview,
 } from "@/lib/worker-validation";
 export async function PUT(
@@ -82,7 +82,11 @@ export async function PUT(
           },
         };
       const merged = { ...latest, ...assignment };
-      if (ended(latest.status) && !ended(merged.status))
+      if (
+        latest.status !== merged.status &&
+        (await assignmentEnded(tx, latest.status)) &&
+        !(await assignmentEnded(tx, merged.status))
+      )
         return {
           status: 409,
           body: {
@@ -179,6 +183,8 @@ export async function PUT(
           throw new DomainError("Số công xác nhận không hợp lệ");
         const asOf = day(body.workDaysAsOf, "ngày chốt công"),
           passed = merged.passedDate ? day(merged.passedDate, "ngày đỗ") : null;
+        if (asOf > today())
+          throw new DomainError("Ngày chốt công không được vượt ngày hiện tại");
         if (
           !passed ||
           asOf <= passed ||

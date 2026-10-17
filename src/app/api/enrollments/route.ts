@@ -174,6 +174,16 @@ export async function PUT(r: NextRequest) {
         throw new DomainError(
           "Cần chốt đủ số công thủ công trước khi xác nhận đạt mốc",
         );
+      if (b.achieved && s.thresholdDays !== null) {
+        const workDaysAsOf = day(
+          s.enrollment.assignment.workDaysAsOf,
+          "ngày chốt công",
+        );
+        if (workDaysAsOf <= passed || workDaysAsOf > achievedOn!)
+          throw new DomainError(
+            "Ngày chốt công phải sau ngày đỗ và không vượt ngày đạt mốc",
+          );
+      }
       const row = await tx.rewardStage.update({
         where: { id: s.id },
         data: {

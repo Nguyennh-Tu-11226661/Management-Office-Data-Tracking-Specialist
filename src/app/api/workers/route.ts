@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { matchesAssignment } from "@/lib/reporting";
 import {
   assignmentRelations,
+  assignmentEnded,
   resultError,
   today,
   warnsWorker,
@@ -14,7 +15,6 @@ import {
   cleanFields,
   validateWorker,
   phoneKey,
-  ended,
   validateInterview,
 } from "@/lib/worker-validation";
 
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
                 "CCCD đang có đợt Đang làm việc/Chưa đào tạo. Xem lịch sử và xác nhận trước khi thêm đợt mới.",
             },
           };
-        if (ended(assignment.status))
+        if (await assignmentEnded(tx, assignment.status))
           return {
             status: 400,
             body: {

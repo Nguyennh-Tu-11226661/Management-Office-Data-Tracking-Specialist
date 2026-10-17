@@ -152,6 +152,11 @@ export async function assignmentRelations(
   }
 }
 
+export async function assignmentEnded(tx: any, name: string): Promise<boolean> {
+  const status = await tx.laborStatus.findUnique({ where: { name } });
+  return status?.endsAssignment === true;
+}
+
 export async function warnsWorker(tx: any, worker: any) {
   const statuses = await tx.laborStatus.findMany({
     where: { warnsDuplicate: true, isActive: true },

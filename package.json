@@ -11,7 +11,7 @@
     "db:seed": "npx tsx prisma/seed.ts",
     "postinstall": "prisma generate",
     "auth:setup": "node scripts/create-user.cjs",
-    "test": "node tests/payment-safety.cjs",
+    "test": "node tests/payment-safety.cjs && node --test tests/business-rules.cjs",
     "test:integration": "node tests/integration.cjs",
     "dev:local": "node scripts/run-next.cjs dev"
   },

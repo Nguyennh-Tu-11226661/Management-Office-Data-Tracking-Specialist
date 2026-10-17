@@ -164,15 +164,6 @@ export function validateWorker(
     throw new Error("Ngày nghỉ không được trước ngày phỏng vấn");
 }
 
-export function ended(status: string) {
-  return [
-    "Đã nghỉ việc",
-    "Trượt phỏng vấn",
-    "Bỏ phỏng vấn",
-    "Bỏ đào tạo",
-    "Bỏ khác",
-  ].includes(status);
-}
 export function validateInterview(a: Record<string, any>) {
   const result = a.interviewResult || "UNKNOWN";
   if (!["UNKNOWN", "PENDING", "PASS", "FAIL", "ABANDONED"].includes(result))

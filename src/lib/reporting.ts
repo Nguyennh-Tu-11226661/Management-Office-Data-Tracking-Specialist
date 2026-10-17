@@ -307,10 +307,8 @@ export function recruitmentReport(workers: any[], p: URLSearchParams) {
   };
 }
 export function rewardReport(enrollments: any[], p: URLSearchParams) {
-  const rows = enrollments.filter(
-    (e) =>
-      !e.assignment.worker.archivedAt && matchesAssignment(e.assignment, p),
-  );
+  // Archiving a worker must not remove financial history or outstanding rewards.
+  const rows = enrollments.filter((e) => matchesAssignment(e.assignment, p));
   const summarize = (list: any[]) => {
     const stages = list.flatMap((e) => e.stages),
       eligible = stages.filter((s) => s.eligible).length,
