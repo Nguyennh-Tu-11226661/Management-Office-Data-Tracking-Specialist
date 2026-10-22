@@ -16,7 +16,7 @@ function load(f) {
       exports: m.exports,
       Buffer,
       Date,
-      require: (n) => {
+      require: (n) => { if (n === '@/lib/duplicate-check') return require('./load-duplicate-check.js');
         if (!(n in deps)) throw Error(n);
         return deps[n];
       },
@@ -30,7 +30,7 @@ deps['@/lib/worker-validation'] = load('src/lib/worker-validation.ts');
 deps['@/lib/source-format'] = load('src/lib/source-format.ts');
 deps['@/lib/factory-matching'] = load('src/lib/factory-matching.ts');
 deps['@/lib/worker-import'] = load('src/lib/worker-import.ts');
-deps['@/lib/auth'] = {
+deps['@/lib/local-request'] = {
   guard: async () => null,
   identity: async () => ({ username: 'QA_MERGE_TESTER' }),
 };
@@ -48,6 +48,9 @@ const dbEvents = [];
 const dbAudits = [];
 
 const mockPrisma = {
+  factory: { findMany: async () => [{ id: 'f-alpha', name: 'ALPHA', code: 'ALPHA', isActive: true }, { id: 'f-beta', name: 'BETA', code: 'BETA', isActive: true }, { id: 'f-luxshare', name: 'LUXSHARE-QC', code: 'LUXSHARE-QC', isActive: true }] },
+  recruiter: { findMany: async () => [] },
+  recruitmentTeam: { findMany: async () => [] },
   worker: {
     findMany: async () => dbWorkers.map(w => ({
       ...w,
@@ -87,7 +90,10 @@ const mockPrisma = {
     }
   },
   laborStatus: {
-    findMany: async () => [{ name: 'Đang làm việc', warnsDuplicate: true, isActive: true }],
+    findMany: async () => [
+      { id: 'status-active', name: 'Đang làm việc', warnsDuplicate: true, isActive: true },
+      { id: 'status-pending', name: 'Đang chờ phỏng vấn', warnsDuplicate: false, isActive: true },
+    ],
     upsert: async () => {}
   },
   assignmentEvent: {
@@ -107,6 +113,12 @@ deps['@/lib/import-source-store'] = {
   saveImportSource: async () => 'mock-source-id',
 };
 
+deps['@/lib/bonus-import'] = load('src/lib/bonus-import.ts');
+deps['node:crypto'] = { default: require('node:crypto') };
+mockPrisma.worker.createMany = async ({data}) => { dbWorkers.push(...data); return {count:data.length}; };
+mockPrisma.workAssignment.createMany = async ({data}) => { dbAssignments.push(...data); return {count:data.length}; };
+mockPrisma.assignmentEvent.createMany = async ({data}) => { dbEvents.push(...data); return {count:data.length}; };
+mockPrisma.bonusRecord = {findMany:async()=>[]};
 const route = load('src/app/api/excel-engine/import/route.ts');
 
 function makeRequest(rows, commit, smartMerge = true) {

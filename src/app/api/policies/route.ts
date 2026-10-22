@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { guard, identity } from "@/lib/auth";
+import { guard, identity } from "@/lib/local-request";
 import { text, day, DomainError, resultError, rulesOf } from "@/lib/domain";
 export const dynamic = "force-dynamic";
 export async function GET(r: NextRequest) {
@@ -10,7 +10,7 @@ export async function GET(r: NextRequest) {
     return NextResponse.json({
       success: true,
       data: await prisma.bonusPolicy.findMany({
-        include: { order: true },
+        include: { order: true, factoryEntry: true },
         orderBy: { createdAt: "desc" },
       }),
     });
@@ -19,13 +19,13 @@ export async function GET(r: NextRequest) {
   }
 }
 async function save(r: NextRequest, edit: boolean) {
-  const denied = await guard(r, "bonus:write");
+  const denied = await guard(r);
   if (denied) return denied;
   try {
     const b = await r.json(),
       actor = (await identity(r))!,
       name = text(b.name, "tên chính sách"),
-      factory = text(b.factory, "nhà máy"),
+      factoryId = text(b.factoryId, "nhà máy"),
       rules = rulesOf(b.rules);
     const from = b.effectiveFrom ? day(b.effectiveFrom, "ngày bắt đầu") : null,
       to = b.effectiveTo ? day(b.effectiveTo, "ngày kết thúc") : null;
@@ -36,11 +36,15 @@ async function save(r: NextRequest, edit: boolean) {
     if (typeof b.isActive !== "boolean")
       throw new DomainError("Trạng thái chính sách không hợp lệ");
     const data = await prisma.$transaction(async (tx) => {
+      const factoryRow = await tx.factory.findUnique({ where: { id: factoryId } });
+      if (!factoryRow || !factoryRow.isActive)
+        throw new DomainError("Nhà máy không tồn tại hoặc đã ngừng dùng");
+      const factory = factoryRow.name;
       if (b.orderId) {
         const order = await tx.recruitmentOrder.findUnique({
           where: { id: b.orderId },
         });
-        if (!order || order.factory !== factory)
+        if (!order || (order.factoryId ? order.factoryId !== factoryId : order.factory !== factory))
           throw new DomainError("Đơn hàng không thuộc nhà máy của chính sách");
       }
       if (edit) {
@@ -54,6 +58,7 @@ async function save(r: NextRequest, edit: boolean) {
       const values = {
         name,
         factory,
+        factoryId,
         rulesJson: JSON.stringify(rules),
         effectiveFrom: from,
         effectiveTo: to,
@@ -86,7 +91,7 @@ export const POST = (r: NextRequest) => save(r, false);
 export const PUT = (r: NextRequest) => save(r, true);
 
 export async function DELETE(r: NextRequest) {
-  const denied = await guard(r, "bonus:write");
+  const denied = await guard(r);
   if (denied) return denied;
   try {
     const b = await r.json(),

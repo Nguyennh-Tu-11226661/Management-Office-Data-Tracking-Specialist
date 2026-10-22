@@ -1,3 +1,4 @@
+import { isActiveAssignment } from "@/lib/duplicate-check";
 import { NextResponse } from "next/server";
 import { dateKey } from "@/lib/worker-validation";
 export class DomainError extends Error {
@@ -42,7 +43,7 @@ export function resultError(error: any) {
           ? error.message
           : error?.code === "P2002"
             ? "Mã hoặc bản ghi đã tồn tại"
-            : "Không thể xử lý yêu cầu",
+            : /Trùng lặp nội bộ|Sai lệch danh tính/.test(error?.message || "") ? error.message : "Không thể xử lý yêu cầu",
     },
     {
       status:
@@ -50,7 +51,7 @@ export function resultError(error: any) {
           ? error.status
           : error?.code === "P2002"
             ? 409
-            : 500,
+            : /Trùng lặp nội bộ|Sai lệch danh tính/.test(error?.message || "") ? 409 : 500,
     },
   );
 }
@@ -94,13 +95,41 @@ export async function assignmentRelations(
   assignment: any,
   existing?: any,
 ) {
-  const status = await tx.laborStatus.findUnique({
-    where: { name: assignment.status },
-  });
-  if (!status || (!status.isActive && existing?.status !== assignment.status))
-    throw new DomainError(
-      "Trạng thái chưa có trong danh mục hoặc đã ngừng dùng",
-    );
+  const findFactory = async (id: string | null, name: string | null) => {
+    if (id) return tx.factory.findUnique({ where: { id } });
+    if (!name) return null;
+    const rows = await tx.factory.findMany();
+    return rows.find((row: any) => row.name.trim().toLocaleLowerCase("vi") === name.trim().toLocaleLowerCase("vi")) || null;
+  };
+  const interviewFactory = await findFactory(
+    assignment.interviewFactoryId || null,
+    assignment.interviewFactory || null,
+  );
+  if (assignment.interviewFactoryId && !interviewFactory)
+    throw new DomainError("Nhà máy phỏng vấn đã chọn không tồn tại");
+  if (interviewFactory && !interviewFactory.isActive && existing?.interviewFactoryId !== interviewFactory.id && existing?.interviewFactory !== interviewFactory.name)
+    throw new DomainError("Nhà máy phỏng vấn đã ngừng dùng");
+  assignment.interviewFactoryId = interviewFactory?.id || null;
+  assignment.interviewFactory = interviewFactory?.name || text(assignment.interviewFactory, "nhà máy phỏng vấn");
+
+  // Working factory is optional source information, never an identity/eligibility condition.
+  assignment.workingFactory = String(assignment.workingFactory || "").trim() || null;
+  assignment.workingFactoryId = null;
+
+  const status = assignment.statusId
+    ? await tx.laborStatus.findUnique({ where: { id: assignment.statusId } })
+    : await tx.laborStatus.findUnique({ where: { name: assignment.status } });
+  if (!status || (!status.isActive && existing?.statusId !== status.id && existing?.status !== status.name))
+    throw new DomainError("Trạng thái chưa có trong danh mục hoặc đã ngừng dùng");
+  if (assignment.status && assignment.status !== status.name)
+    throw new DomainError("Tên trạng thái không khớp danh mục trạng thái đã chọn");
+  assignment.statusId = status.id;
+  assignment.status = status.name;
+  if (!assignment.recruiterId && assignment.recruiter) {
+    const candidates = await tx.recruiter.findMany({ include: { team: true } });
+    const matched = candidates.find((r: any) => r.name.trim().toLocaleLowerCase("vi") === assignment.recruiter.trim().toLocaleLowerCase("vi"));
+    if (matched) assignment.recruiterId = matched.id;
+  }
   if (assignment.recruiterId) {
     const recruiter = await tx.recruiter.findUnique({
       where: { id: assignment.recruiterId },
@@ -111,11 +140,14 @@ export async function assignmentRelations(
       (!recruiter.isActive && existing?.recruiterId !== assignment.recruiterId)
     )
       throw new DomainError("Chuyên viên đã ngừng dùng hoặc không tồn tại");
-    if (!existing || existing.recruiterId !== assignment.recruiterId) {
-      assignment.recruiter = recruiter.name;
-      assignment.teamId = recruiter.teamId;
-      assignment.team = recruiter.team?.name || "";
-    }
+    assignment.recruiter = recruiter.name;
+    assignment.teamId = recruiter.teamId;
+    assignment.team = recruiter.team?.name || "";
+  }
+  if (!assignment.teamId && assignment.team) {
+    const teams = await tx.recruitmentTeam.findMany();
+    const matched = teams.find((t: any) => t.name.trim().toLocaleLowerCase("vi") === assignment.team.trim().toLocaleLowerCase("vi"));
+    if (matched) assignment.teamId = matched.id;
   }
   if (assignment.teamId && !assignment.recruiterId) {
     const team = await tx.recruitmentTeam.findUnique({
@@ -137,7 +169,10 @@ export async function assignmentRelations(
     });
     if (!order || (!order.isActive && existing?.orderId !== orderId))
       throw new DomainError("Đơn hàng không tồn tại hoặc đã ngừng tuyển");
-    if (order.factory !== assignment.interviewFactory)
+    if (
+      (order.factoryId && order.factoryId !== assignment.interviewFactoryId) ||
+      (!order.factoryId && order.factory !== assignment.interviewFactory)
+    )
       throw new DomainError("Nhà máy PV không khớp đơn hàng");
   }
   if (batchId) {
@@ -159,8 +194,7 @@ export async function assignmentEnded(tx: any, name: string): Promise<boolean> {
 
 export async function warnsWorker(tx: any, worker: any) {
   const statuses = await tx.laborStatus.findMany({
-    where: { warnsDuplicate: true, isActive: true },
+    where: { isActive: true },
   });
-  const names = new Set(statuses.map((s: any) => s.name));
-  return worker.assignments.some((a: any) => names.has(a.status));
+  return worker.assignments.some((a: any) => isActiveAssignment(a, statuses));
 }

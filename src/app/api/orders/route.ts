@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { guard, identity } from "@/lib/auth";
+import { guard, identity } from "@/lib/local-request";
 import { prisma } from "@/lib/prisma";
 import { text, day, DomainError, resultError } from "@/lib/domain";
 
@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
       success: true,
       data: await prisma.recruitmentOrder.findMany({
         include: {
+          factoryEntry: true,
           batches: { orderBy: { startDate: "desc" } },
           _count: { select: { assignments: true } },
         },
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
 }
 
 async function save(request: NextRequest, edit: boolean) {
-  const denied = await guard(request, "worker:write");
+  const denied = await guard(request);
   if (denied) return denied;
   try {
     const body = await request.json(),
@@ -155,7 +156,7 @@ export const POST = (r: NextRequest) => save(r, false);
 export const PUT = (r: NextRequest) => save(r, true);
 
 export async function DELETE(r: NextRequest) {
-  const denied = await guard(r, "worker:write");
+  const denied = await guard(r);
   if (denied) return denied;
   try {
     const b = await r.json(),

@@ -1,3 +1,4 @@
+import { assertDailyInterview, isActiveAssignment } from "@/lib/duplicate-check";
 import { NextRequest, NextResponse } from "next/server";
 import {
   assignmentRelations,
@@ -8,7 +9,7 @@ import {
   DomainError,
 } from "@/lib/domain";
 import { prisma } from "@/lib/prisma";
-import { guard, identity } from "@/lib/auth";
+import { guard, identity } from "@/lib/local-request";
 import {
   WORKER_FIELDS,
   ASSIGNMENT_FIELDS,
@@ -27,7 +28,7 @@ export async function PUT(
     };
   },
 ) {
-  const denied = await guard(request, "worker:write");
+  const denied = await guard(request);
   if (denied) return denied;
   let body: any,
     worker: Record<string, string>,
@@ -82,6 +83,19 @@ export async function PUT(
           },
         };
       const merged = { ...latest, ...assignment };
+      for (const [nameField, idField] of [
+        ["interviewFactory", "interviewFactoryId"],
+        ["workingFactory", "workingFactoryId"],
+        ["status", "statusId"],
+      ]) {
+        if (
+          assignment[nameField] !== undefined &&
+          assignment[idField] === undefined &&
+          assignment[nameField] !== latest[nameField]
+        )
+          merged[idField] = null;
+      }
+      assertDailyInterview(current, merged, latest.id);
       if (
         latest.status !== merged.status &&
         (await assignmentEnded(tx, latest.status)) &&
@@ -113,6 +127,8 @@ export async function PUT(
         validateWorker({ ...current, ...worker }, merged);
         validateInterview(merged);
         await assignmentRelations(tx, merged, latest);
+        for (const field of ["interviewFactoryId", "workingFactoryId", "statusId"])
+          if (merged[field] !== latest[field]) assignment[field] = merged[field];
         if (body.recruiterId !== undefined || body.teamId !== undefined)
           Object.assign(assignment, {
             recruiter: merged.recruiter,
@@ -127,19 +143,19 @@ export async function PUT(
       }
       if (worker.phone) {
         const names = await tx.laborStatus.findMany({
-          where: { warnsDuplicate: true, isActive: true },
+          where: { isActive: true },
         });
         const others = await tx.worker.findMany({
           where: {
             id: { not: current.id },
             phone: { not: null },
             archivedAt: null,
-            assignments: { some: { status: { in: names.map((s) => s.name) } } },
+
           },
-          select: { phone: true },
+          include: { assignments: true },
         });
         if (
-          others.some((w) => phoneKey(w.phone!) === worker.phone) &&
+          others.some((w) => phoneKey(w.phone!) === worker.phone && w.assignments.some((a) => isActiveAssignment(a, names))) &&
           body.confirmPhoneDuplicate !== true
         )
           return {
@@ -247,7 +263,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const denied = await guard(request, "worker:write");
+  const denied = await guard(request);
   if (denied) return denied;
   try {
     const actor = (await identity(request))!;
@@ -290,7 +306,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const denied = await guard(request, "worker:write");
+  const denied = await guard(request);
   if (denied) return denied;
   try {
     const actor = (await identity(request))!;

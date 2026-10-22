@@ -14,9 +14,7 @@ const originals = ["prisma/dev.db", "prisma/schema.prisma", ".env"]
 const db = path.join(root, "test.db").replace(/\\/g, "/");
 fs.writeFileSync(
   path.join(root, "schema.prisma"),
-  fs
-    .readFileSync("prisma/schema.prisma", "utf8")
-    .replace("file:./dev.db", "file:" + db),
+  fs.readFileSync("prisma/schema.prisma", "utf8"),
 );
 fs.writeFileSync(db, "");
 const pushed = spawnSync(
@@ -29,31 +27,32 @@ const pushed = spawnSync(
     path.join(root, "schema.prisma"),
     "--skip-generate",
   ],
-  { encoding: "utf8" },
+  {
+    encoding: "utf8",
+    env: { ...process.env, DATABASE_URL: "file:" + db },
+  },
 );
 if (pushed.status !== 0) throw new Error(pushed.stderr || pushed.stdout);
 const fixtureClient = new (require("../.generated/client").PrismaClient)({
   datasources: { db: { url: "file:" + db } },
 });
+let qaFactoryId = "";
 const fixtureReady = require("../scripts/seed-catalogs.cjs")(
   fixtureClient,
-).finally(() => fixtureClient.$disconnect());
-const password = crypto.randomBytes(24).toString("hex");
-const users = ["ADMIN", "HR", "FINANCE", "VIEWER"].map((role) => {
-  const salt = crypto.randomBytes(16).toString("hex");
-  return {
-    username: role.toLowerCase(),
-    role,
-    salt,
-    hash: crypto.scryptSync(password, salt, 64).toString("hex"),
-    version: crypto.randomUUID(),
-  };
-});
-const authFile = path.join(root, "auth.json");
-fs.writeFileSync(
-  authFile,
-  JSON.stringify({ secret: crypto.randomBytes(32).toString("hex"), users }),
-);
+)
+  .then(async () => {
+    const factory = await
+    fixtureClient.factory.upsert({
+      where: { name: "QA TEST FACTORY" },
+      create: {
+        code: "QA-TEST-FACTORY",
+        name: "QA TEST FACTORY",
+      },
+      update: { isActive: true },
+    });
+    qaFactoryId = factory.id;
+  })
+  .finally(() => fixtureClient.$disconnect());
 const server = spawn(
   process.execPath,
   [
@@ -67,11 +66,9 @@ const server = spawn(
   {
     env: {
       ...process.env,
-      LOCAL_DEMO_AUTO_VIEW: "0",
       LOCAL_BUILD_DIR:
         process.env.QA_PRODUCTION === "1" ? ".next-evolution" : ".next-qa",
-      LOCAL_TEST_DATABASE_URL: "file:" + db,
-      LOCAL_AUTH_FILE: authFile,
+      DATABASE_URL: "file:" + db,
     },
     stdio: ["ignore", "pipe", "pipe"],
   },
@@ -117,24 +114,14 @@ async function json(url, method, data, cookie, expected = 200) {
   await fixtureReady;
   for (let i = 0; i < 100; i++) {
     try {
-      const r = await fetch(base + "/api/auth/me");
-      if (r.status === 401) break;
+      const r = await fetch(base + "/api/workers");
+      if (r.status === 200) break;
     } catch {}
     if (server.exitCode !== null) throw new Error("Server exited: " + logs);
     await new Promise((r) => setTimeout(r, 500));
     if (i === 99) throw new Error("Server not ready: " + logs);
   }
-  const cookies = {};
-  for (const role of ["admin", "hr", "finance", "viewer"]) {
-    const r = await req("/api/auth/login", "POST", {
-      username: role,
-      password,
-    });
-    cookies[role] = r.headers.get("set-cookie").split(";")[0];
-  }
-  await req("/api/workers", "GET", undefined, "", 401);
-  await req("/api/workers", "POST", {}, cookies.viewer, 403);
-  await req("/api/bonuses", "POST", {}, cookies.hr, 403);
+  await req("/api/workers");
   const data = {
     fullName: "QA TEST WORKER",
     idCard: "000000000001",
@@ -144,21 +131,21 @@ async function json(url, method, data, cookie, expected = 200) {
     interviewDate: "01/10/2026",
     onboardingMonth: "T10.2026",
   };
-  let w = (await json("/api/workers", "POST", data, cookies.hr, 201)).data;
-  await req("/api/workers", "POST", data, cookies.hr, 409);
-  await req("/api/workers", "POST", { ...data, rehire: true }, cookies.hr, 409);
+  let w = (await json("/api/workers", "POST", data, "", 201)).data;
+  await req("/api/workers", "POST", data, "", 409);
+  await req("/api/workers", "POST", { ...data, rehire: true }, "", 409);
   await req(
     "/api/workers",
     "POST",
     { ...data, idCard: "000000000002" },
-    cookies.hr,
+    "",
     409,
   );
   await req(
     "/api/workers",
     "POST",
     { ...data, idCard: "000000000002", confirmPhoneDuplicate: true },
-    cookies.hr,
+    "",
     201,
   );
   let change = {
@@ -169,29 +156,30 @@ async function json(url, method, data, cookie, expected = 200) {
     leaveDate: "31/02/2026",
     leaveReason: "QA",
   };
-  await req("/api/workers/" + w.id, "PUT", change, cookies.hr, 400);
+  await req("/api/workers/" + w.id, "PUT", change, "", 400);
   change.leaveDate = "10/10/2026";
   change.dob = null;
   change.address = null;
   change.expectedTrainingDate = null;
-  w = (await json("/api/workers/" + w.id, "PUT", change, cookies.hr)).data;
-  await req("/api/workers/" + w.id, "PUT", change, cookies.hr, 409);
+  w = (await json("/api/workers/" + w.id, "PUT", change, "")).data;
+  await req("/api/workers/" + w.id, "PUT", change, "", 409);
   const old = w.assignments[0].id;
   w = (
     await json(
       "/api/workers",
       "POST",
-      { ...data, rehire: true, status: "Đang chờ phỏng vấn" },
-      cookies.hr,
+      { ...data, rehire: true, interviewDate: "11/10/2026", status: "Đang chờ phỏng vấn" },
+      "",
       201,
     )
   ).data;
   assert.equal(w.assignments.length, 2);
   assert.equal(w.assignments.find((a) => a.id === old).status, "Đã nghỉ việc");
-  await req("/api/workers/" + w.id, "DELETE", undefined, cookies.admin, 409);
+  await req("/api/workers/" + w.id, "DELETE", undefined, "", 409);
   const bonus = {
     workerId: w.id,
     assignmentId: w.assignments[0].id,
+    company: "QA TEST FACTORY",
     month: "T10.2026",
     bonus1: 300000,
     bonus2: 0,
@@ -206,25 +194,25 @@ async function json(url, method, data, cookie, expected = 200) {
     "/api/bonuses",
     "POST",
     { ...bonus, bonus1: -1 },
-    cookies.finance,
+    "",
     400,
   );
-  let b = (await json("/api/bonuses", "POST", bonus, cookies.finance, 201))
+  let b = (await json("/api/bonuses", "POST", bonus, "", 201))
     .data;
-  await req("/api/bonuses", "POST", bonus, cookies.finance, 409);
+  await req("/api/bonuses", "POST", bonus, "", 409);
   b = (
     await json(
       "/api/bonuses",
       "PATCH",
       { ...bonus, id: b.id, updatedAt: b.updatedAt, bonus1: 500000 },
-      cookies.finance,
+      "",
     )
   ).data;
   await req(
     "/api/bonuses",
     "PUT",
     { id: b.id, status: "LOCKED" },
-    cookies.finance,
+    "",
     409,
   );
   b = (
@@ -232,15 +220,15 @@ async function json(url, method, data, cookie, expected = 200) {
       "/api/bonuses",
       "PUT",
       { id: b.id, status: "APPROVED", approver: "Spoofed" },
-      cookies.finance,
+      "",
     )
   ).data;
-  assert.equal(b.approvedBy, "finance");
+  assert.equal(b.approvedBy, "Người dùng local");
   await req(
     "/api/bonuses",
     "PATCH",
     { ...bonus, id: b.id, updatedAt: b.updatedAt },
-    cookies.finance,
+    "",
     409,
   );
   b = (
@@ -248,21 +236,21 @@ async function json(url, method, data, cookie, expected = 200) {
       "/api/bonuses",
       "PUT",
       { id: b.id, status: "LOCKED" },
-      cookies.finance,
+      "",
     )
   ).data;
   await req(
     "/api/bonuses",
     "PUT",
     { id: b.id, status: "DRAFT" },
-    cookies.finance,
+    "",
     400,
   );
   await req(
     "/api/bonuses",
     "PUT",
     { id: b.id, status: "APPROVED" },
-    cookies.finance,
+    "",
     409,
   );
   let account = (
@@ -275,7 +263,7 @@ async function json(url, method, data, cookie, expected = 200) {
         accountNumber: "00012345",
         accountHolderName: data.fullName,
       },
-      cookies.finance,
+      "",
     )
   ).data;
   assert.equal(account.verificationStatus, "UNVERIFIED");
@@ -285,7 +273,7 @@ async function json(url, method, data, cookie, expected = 200) {
       "/api/bank-accounts",
       "PUT",
       { ...account, accountNumber: "00054321" },
-      cookies.finance,
+      "",
     )
   ).data;
   assert.equal(account.verificationStatus, "UNVERIFIED");
@@ -293,52 +281,53 @@ async function json(url, method, data, cookie, expected = 200) {
     "/api/bank-accounts/verify",
     "POST",
     { bankName: "QA BANK", accountNumber: "00054321" },
-    cookies.finance,
+    "",
     503,
   );
   await req(
     "/api/excel-engine/export?type=PAYMENT_BATCH&month=T10.2026",
     "GET",
     undefined,
-    cookies.finance,
+    "",
     409,
   );
   await req(
     "/api/excel-engine/export?type=PAYMENT_BATCH&month=T10.2026",
     "GET",
     undefined,
-    cookies.hr,
-    403,
+    "",
+    409,
   );
   await req(
     "/api/excel-engine/export?type=WORKERS",
     "GET",
     undefined,
-    cookies.viewer,
-    403,
+    "",
+    200,
   );
   const exported = await req(
     "/api/excel-engine/export?type=WORKERS",
     "GET",
     undefined,
-    cookies.hr,
+    "",
   );
   assert.ok((await exported.arrayBuffer()).byteLength > 0);
   await req(
     "/api/excel-engine/export?type=DUPLICATES",
     "GET",
     undefined,
-    cookies.hr,
+    "",
   );
   await req(
     "/api/excel-engine/export?type=TEMPLATE",
     "GET",
     undefined,
-    cookies.hr,
+    "",
   );
   const policy = {
     name: "QA POLICY",
     factory: "QA TEST FACTORY",
+    factoryId: qaFactoryId,
     isActive: true,
     rules: Array.from({ length: 7 }, (_, i) => ({
       step: i + 1,
@@ -347,15 +336,14 @@ async function json(url, method, data, cookie, expected = 200) {
     })),
   };
   const pol = (
-    await json("/api/policies", "POST", policy, cookies.finance, 201)
+    await json("/api/policies", "POST", policy, "", 201)
   ).data;
   await req(
     "/api/policies",
     "PUT",
     { ...policy, id: pol.id, updatedAt: pol.updatedAt, isActive: false },
-    cookies.finance,
+    "",
   );
-  await req("/api/policies", "POST", policy, cookies.hr, 403);
   const lookup = (
     await json("/api/lookup", "POST", {
       idCard: data.idCard,
@@ -415,22 +403,22 @@ async function json(url, method, data, cookie, expected = 200) {
     "/api/excel-engine/import",
     "POST",
     form(false),
-    cookies.hr,
+    "",
   );
   assert.equal(preview.preview, true);
   assert.equal(preview.summary.readyCount, 1);
   assert.equal(preview.summary.duplicateCount, 1);
   assert.equal(preview.summary.errorCount, 1);
-  let workers = await json("/api/workers", "GET", undefined, cookies.hr);
+  let workers = await json("/api/workers", "GET", undefined, "");
   assert.equal(workers.data.length, 2);
   const imported = await json(
     "/api/excel-engine/import",
     "POST",
     form(true),
-    cookies.hr,
+    "",
   );
   assert.equal(imported.summary.successCount, 1);
-  workers = await json("/api/workers", "GET", undefined, cookies.hr);
+  workers = await json("/api/workers", "GET", undefined, "");
   assert.equal(workers.data.length, 3);
 
   const factory = (
@@ -438,7 +426,7 @@ async function json(url, method, data, cookie, expected = 200) {
       "/api/catalogs",
       "POST",
       { kind: "FACTORY", name: "QA V3 FACTORY", code: "QA-V3", isActive: true },
-      cookies.hr,
+      "",
       201,
     )
   ).data;
@@ -447,7 +435,7 @@ async function json(url, method, data, cookie, expected = 200) {
       "/api/catalogs",
       "POST",
       { kind: "TEAM", name: "QA V3 TEAM", code: "QA-TEAM", isActive: true },
-      cookies.hr,
+      "",
       201,
     )
   ).data;
@@ -462,7 +450,7 @@ async function json(url, method, data, cookie, expected = 200) {
         teamId: team.id,
         isActive: true,
       },
-      cookies.hr,
+      "",
       201,
     )
   ).data;
@@ -477,7 +465,7 @@ async function json(url, method, data, cookie, expected = 200) {
         factoryId: factory.id,
         isActive: true,
       },
-      cookies.hr,
+      "",
       201,
     )
   ).data;
@@ -495,7 +483,7 @@ async function json(url, method, data, cookie, expected = 200) {
         periodMonth: "2026-10",
         target: 2,
       },
-      cookies.hr,
+      "",
       201,
     )
   ).data;
@@ -506,6 +494,7 @@ async function json(url, method, data, cookie, expected = 200) {
       {
         name: "QA V3 POLICY",
         factory: factory.name,
+        factoryId: factory.id,
         orderId: order.id,
         isActive: true,
         effectiveFrom: "2026-10-01",
@@ -515,7 +504,7 @@ async function json(url, method, data, cookie, expected = 200) {
           { step: 2, milestone: "7 công", thresholdDays: 7, amount: 500000 },
         ],
       },
-      cookies.finance,
+      "",
       201,
     )
   ).data;
@@ -537,7 +526,7 @@ async function json(url, method, data, cookie, expected = 200) {
     status: "Đang làm việc",
     employeeCode: "QA-EMP-001",
   };
-  let person = (await json("/api/workers", "POST", v3input, cookies.hr, 201))
+  let person = (await json("/api/workers", "POST", v3input, "", 201))
     .data;
   const first = person.assignments[0];
   assert.equal(first.team, team.name);
@@ -550,10 +539,10 @@ async function json(url, method, data, cookie, expected = 200) {
         assignmentId: first.id,
         updatedAt: person.updatedAt,
         assignmentUpdatedAt: first.updatedAt,
-        confirmedWorkDays: 7,
-        workDaysAsOf: "2026-10-10",
+        confirmedWorkDays: 3,
+        workDaysAsOf: "2026-10-04",
       },
-      cookies.hr,
+      "",
     )
   ).data;
   const enrollment = (
@@ -561,7 +550,7 @@ async function json(url, method, data, cookie, expected = 200) {
       "/api/enrollments",
       "POST",
       { assignmentId: first.id, policyId: policyV3.id },
-      cookies.finance,
+      "",
       201,
     )
   ).data;
@@ -569,7 +558,7 @@ async function json(url, method, data, cookie, expected = 200) {
     "/api/enrollments",
     "POST",
     { assignmentId: first.id, policyId: policyV3.id },
-    cookies.finance,
+    "",
     409,
   );
   let stage1 = enrollment.stages[0],
@@ -584,7 +573,7 @@ async function json(url, method, data, cookie, expected = 200) {
       achieved: true,
       achievedOn: "2026-10-04",
     },
-    cookies.finance,
+    "",
     400,
   );
   stage1 = (
@@ -600,7 +589,7 @@ async function json(url, method, data, cookie, expected = 200) {
         achievedOn: "2026-10-04",
         note: "QA manual evidence",
       },
-      cookies.finance,
+      "",
     )
   ).data;
   await req(
@@ -613,7 +602,7 @@ async function json(url, method, data, cookie, expected = 200) {
       eligibleAsOf: "2026-10-10",
       achieved: false,
     },
-    cookies.finance,
+    "",
   );
   await req(
     "/api/reward-payments",
@@ -625,7 +614,7 @@ async function json(url, method, data, cookie, expected = 200) {
       reference: "QA-PAY-001",
       confirmActualPayment: false,
     },
-    cookies.finance,
+    "",
     400,
   );
   await req(
@@ -638,7 +627,7 @@ async function json(url, method, data, cookie, expected = 200) {
       reference: "QA-PAY-001",
       confirmActualPayment: true,
     },
-    cookies.finance,
+    "",
     201,
   );
   await req(
@@ -651,7 +640,7 @@ async function json(url, method, data, cookie, expected = 200) {
       reference: "QA-PAY-001",
       confirmActualPayment: true,
     },
-    cookies.finance,
+    "",
     409,
   );
   await req(
@@ -664,7 +653,7 @@ async function json(url, method, data, cookie, expected = 200) {
       reference: "QA-PAY-OVER",
       confirmActualPayment: true,
     },
-    cookies.finance,
+    "",
     409,
   );
   let report = (
@@ -672,7 +661,7 @@ async function json(url, method, data, cookie, expected = 200) {
       "/api/reports?month=2026-10&orderId=" + order.id,
       "GET",
       undefined,
-      cookies.admin,
+      "",
     )
   ).data;
   assert.equal(report.recruitment.summary.passed, 1);
@@ -685,7 +674,7 @@ async function json(url, method, data, cookie, expected = 200) {
       "/api/worker-history?search=QA-EMP-001",
       "GET",
       undefined,
-      cookies.hr,
+      "",
     )
   ).data;
   assert.equal(history[0].id, person.id);
@@ -705,14 +694,14 @@ async function json(url, method, data, cookie, expected = 200) {
         { step: 1, milestone: "New amount", thresholdDays: 3, amount: 900000 },
       ],
     },
-    cookies.finance,
+    "",
   );
   const preserved = (
     await json(
       "/api/enrollments?assignmentId=" + first.id,
       "GET",
       undefined,
-      cookies.finance,
+      "",
     )
   ).data[0];
   assert.equal(preserved.stages[0].amount, 300000);
@@ -729,7 +718,7 @@ async function json(url, method, data, cookie, expected = 200) {
         leaveDate: "2026-10-10",
         leaveReason: "QA",
       },
-      cookies.hr,
+      "",
     )
   ).data;
   person = (
@@ -745,7 +734,7 @@ async function json(url, method, data, cookie, expected = 200) {
         status: "Chưa đào tạo",
         employeeCode: "QA-EMP-002",
       },
-      cookies.hr,
+      "",
       201,
     )
   ).data;
@@ -755,7 +744,7 @@ async function json(url, method, data, cookie, expected = 200) {
       "/api/reports?month=2026-10&orderId=" + order.id,
       "GET",
       undefined,
-      cookies.admin,
+      "",
     )
   ).data;
   assert.equal(report.recruitment.summary.total, 2);
@@ -776,27 +765,27 @@ async function json(url, method, data, cookie, expected = 200) {
         status: "Bỏ phỏng vấn",
         interviewResult: "ABANDONED",
       },
-      cookies.hr,
+      "",
     )
   ).data;
-  await req("/api/workers/" + person.id, "DELETE", undefined, cookies.hr);
+  await req("/api/workers/" + person.id, "DELETE", undefined, "");
   assert.equal(
     (
       await json(
         "/api/worker-history?id=" + person.id,
         "GET",
         undefined,
-        cookies.hr,
+        "",
       )
     ).data[0].assignments.length,
     2,
   );
-  await req("/api/workers/" + person.id, "PATCH", {}, cookies.hr);
+  await req("/api/workers/" + person.id, "PATCH", {}, "");
   await req(
     "/api/catalogs",
     "DELETE",
     { kind: "RECRUITER", id: recruiter.id, updatedAt: recruiter.updatedAt },
-    cookies.hr,
+    "",
   );
   assert.equal(
     (
@@ -804,78 +793,22 @@ async function json(url, method, data, cookie, expected = 200) {
         "/api/worker-history?id=" + person.id,
         "GET",
         undefined,
-        cookies.hr,
+        "",
       )
     ).data[0].assignments[0].recruiter,
     "QA RECRUITER",
   );
-  const audit = await json("/api/audit", "GET", undefined, cookies.admin);
+  const audit = await json("/api/audit", "GET", undefined, "");
   assert.ok(audit.total >= 10);
-  await req("/api/audit", "GET", undefined, cookies.hr, 403);
-  await req("/api/users", "GET", undefined, cookies.viewer, 403);
-  const newPassword = crypto.randomBytes(24).toString("hex");
-  await req(
-    "/api/users",
-    "POST",
-    {
-      mode: "create",
-      username: "qauser",
-      role: "VIEWER",
-      password: newPassword,
-    },
-    cookies.admin,
-  );
-  await req(
-    "/api/users",
-    "POST",
-    { mode: "update", username: "admin", role: "HR" },
-    cookies.admin,
-    400,
-  );
-  const q = await req("/api/auth/login", "POST", {
-    username: "qauser",
-    password: newPassword,
-  });
-  const qCookie = q.headers.get("set-cookie").split(";")[0];
-  await req(
-    "/api/users",
-    "POST",
-    { mode: "update", username: "qauser", role: "HR" },
-    cookies.admin,
-  );
-  await req("/api/auth/me", "GET", undefined, qCookie, 401);
-  await req(
-    "/api/users",
-    "POST",
-    { mode: "update", username: "qauser", role: "HR", isActive: false },
-    cookies.admin,
-  );
-  await req(
-    "/api/auth/login",
-    "POST",
-    { username: "qauser", password: newPassword },
-    "",
-    401,
-  );
-  await req("/api/auth/me", "GET", undefined, cookies.admin + "tampered", 401);
   const csrf = await fetch(base + "/api/workers", {
     method: "POST",
-    headers: { Cookie: cookies.admin, "Content-Type": "application/json" },
+    headers: { Cookie: "", "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
   assert.equal(csrf.status, 403);
   checks++;
-  const authAudit = await json(
-    "/api/audit?module=AUTH",
-    "GET",
-    undefined,
-    cookies.admin,
-  );
-  assert.ok(authAudit.total >= 2);
-  await req("/api/auth/logout", "POST", undefined, cookies.admin);
-  await req("/api/auth/me", "GET", undefined, cookies.admin, 401);
   console.log(
-    `PASS ${checks} HTTP checks: authentication, RBAC, CSRF, rehire/history, stale updates, bonus draft/approval/lock, bank validation, blocked payment, Excel preview/import/export, policy and audit. Isolated test database only.`,
+    `PASS ${checks} HTTP checks: direct local access, CSRF, rehire/history, stale updates, bonus draft/approval/lock, bank validation, blocked payment, Excel preview/import/export, policy and audit. Isolated test database only.`,
   );
   fs.writeFileSync(
     path.join(root, "result.json"),

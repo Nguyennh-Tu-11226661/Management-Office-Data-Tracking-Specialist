@@ -1,3 +1,4 @@
+import { invalidateReadCache } from "@/lib/read-cache";
 import {splitImportReview} from '@/lib/import-review';
 import {mkdir,writeFile,rename,readdir,readFile,unlink,stat} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
@@ -27,7 +28,7 @@ export async function saveImportSource(type:string,file:string,sheet:string,rows
  };
  await writeFile(target+'.tmp',JSON.stringify(payload),'utf8');
  await rename(target+'.tmp',target);
- memoryCache.clear();
+ memoryCache.clear();invalidateReadCache();
  return id;
 }
 
@@ -53,7 +54,38 @@ export async function deleteImportSource(id?:string){
  for(const f of files.filter(f=>/^[a-f0-9-]+\.json$/.test(f))){
   if(!id||f===`${id}.json`){
    memoryCache.delete(f);
-   await unlink(path.join(directory,f)).catch(()=>{});
+   await unlink(path.join(directory,f)).catch(()=>{});invalidateReadCache();
   }
  }
+}
+
+export async function resolveImportSourceRow(sourceId:string,rowNum:number,mode:'APPROVE'|'DELETE'){
+ const fileName=`${sourceId}.json`;
+ const filePath=path.join(directory,fileName);
+ const raw=await readFile(filePath,'utf8');
+ const data=JSON.parse(raw);
+ const targetRow=(data.rows||[]).find((r:any)=>Number(r.row)===Number(rowNum));
+ if(!targetRow) return null;
+ if(mode==='DELETE'){
+  data.rows=(data.rows||[]).filter((r:any)=>Number(r.row)!==Number(rowNum));
+ }else{
+  targetRow.warnings=[];
+  targetRow.duplicates=[];
+  targetRow.isApproved=true;
+ }
+ await writeFile(filePath+'.tmp',JSON.stringify(data),'utf8');
+ await rename(filePath+'.tmp',filePath);
+ memoryCache.delete(fileName);invalidateReadCache();
+ return {source:data,row:targetRow};
+}
+
+
+export async function correctImportSourceDate(sourceId:string,rowNum:number,interviewDate:string){
+ if(!/^[a-f0-9-]+$/.test(sourceId))throw new Error('Mã nguồn không hợp lệ');
+ const file=path.join(directory,sourceId+'.json');
+ const data=JSON.parse(await readFile(file,'utf8'));
+ const row=(data.rows||[]).find((r:any)=>Number(r.row)===rowNum);
+ if(!row)throw new Error('Không tìm thấy dòng nguồn');
+ row.values={...row.values,'Ngày PV':interviewDate};
+ await writeFile(file+'.tmp',JSON.stringify(data),'utf8');await rename(file+'.tmp',file);memoryCache.delete(sourceId+'.json');invalidateReadCache();
 }

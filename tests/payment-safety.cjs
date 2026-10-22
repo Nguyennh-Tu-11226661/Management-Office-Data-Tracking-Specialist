@@ -26,8 +26,9 @@ function load(file, deps = {}) {
   return module.exports;
 }
 const rules = load("src/lib/payment-safety.ts");
+const workerValidation = load("src/lib/worker-validation.ts");
 const server = {
-  "@/lib/auth": {
+  "@/lib/local-request": {
     guard: async () => null,
     identity: async () => ({ username: "Tester", role: "ADMIN" }),
   },
@@ -117,6 +118,7 @@ const server = {
     ...server,
     "@/lib/prisma": { prisma: mock },
     "@/lib/payment-safety": rules,
+    "@/lib/worker-validation": workerValidation,
   });
   const put = (data) => bonuses.PUT({ json: async () => data });
   assert.equal((await put({ id: "test", status: "UNKNOWN" })).status, 400);

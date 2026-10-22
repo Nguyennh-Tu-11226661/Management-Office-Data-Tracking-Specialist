@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { rateLimit, sameOrigin } from "@/lib/auth";
+import { rateLimit, sameOrigin } from "@/lib/local-request";
 import { phoneKey } from "@/lib/worker-validation";
 import { createHash } from "node:crypto";
 
@@ -33,10 +33,38 @@ export async function POST(request: NextRequest) {
   }
 
   const idCard = typeof body?.idCard === "string" ? body.idCard.trim() : "";
+  const code =
+    typeof body?.code === "string"
+      ? body.code.trim()
+      : typeof body?.employeeCode === "string"
+        ? body.employeeCode.trim()
+        : typeof body?.workerCode === "string"
+          ? body.workerCode.trim()
+          : "";
   const lastPhone4 =
     typeof body?.lastPhone4 === "string" ? body.lastPhone4.trim() : "";
 
-  if (!/^(\d{9}|\d{12})$/.test(idCard) || !/^\d{4}$/.test(lastPhone4)) {
+  if (!idCard && !code) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Vui lòng nhập Số CCCD hoặc Mã Nhân Viên để tra cứu",
+      },
+      { status: 400 },
+    );
+  }
+
+  if (idCard && !/^(\d{9}|\d{12})$/.test(idCard)) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Cần CCCD 12 số hoặc CMT 9 số hợp lệ",
+      },
+      { status: 400 },
+    );
+  }
+
+  if (lastPhone4 && !code && !/^\d{4}$/.test(lastPhone4)) {
     return NextResponse.json(
       {
         success: false,
@@ -46,9 +74,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const rateKey = idCard || code.toUpperCase();
   if (
     !rateLimit(
-      "lookup:" + createHash("sha256").update(idCard).digest("hex"),
+      "lookup:" + createHash("sha256").update(rateKey).digest("hex"),
       10,
     )
   ) {
@@ -62,48 +91,97 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Lấy toàn bộ lịch sử các công ty (assignments) mà người lao động từng tham gia
-    const worker = await prisma.worker.findUnique({
-      where: { idCard },
-      include: {
-        assignments: {
-          include: {
-            order: true,
-            batch: true,
-            bonusRecords: {
-              where: { status: { in: ["APPROVED", "LOCKED"] } },
-              orderBy: { createdAt: "desc" },
-            },
-            enrollments: {
-              include: {
-                stages: {
-                  include: { payments: true },
-                  orderBy: { step: "asc" },
-                },
+    const includeConfig = {
+      assignments: {
+        include: {
+          order: true,
+          batch: true,
+          bonusRecords: {
+            where: { status: { in: ["APPROVED", "LOCKED"] } },
+            orderBy: { createdAt: "desc" as const },
+          },
+          enrollments: {
+            include: {
+              stages: {
+                include: { payments: true },
+                orderBy: { step: "asc" as const },
               },
             },
           },
-          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         },
-        bonusRecords: {
-          where: { status: { in: ["APPROVED", "LOCKED"] } },
-          orderBy: { createdAt: "desc" },
-        },
-        bankAccounts: {
-          orderBy: { createdAt: "desc" },
-        },
+        orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }],
       },
-    });
+      bonusRecords: {
+        where: { status: { in: ["APPROVED", "LOCKED"] } },
+        orderBy: { createdAt: "desc" as const },
+      },
+      bankAccounts: {
+        orderBy: { createdAt: "desc" as const },
+      },
+    };
 
-    if (
-      !worker ||
-      !worker.phone ||
-      !phoneKey(worker.phone).endsWith(lastPhone4)
-    ) {
+    const codeVariants = code
+      ? Array.from(new Set([code, code.toUpperCase(), code.toLowerCase()]))
+      : [];
+
+    // Tìm theo CCCD (nếu có) hoặc tìm trực tiếp theo Mã nhân viên
+    const worker = idCard
+      ? await prisma.worker.findUnique({
+          where: { idCard },
+          include: includeConfig,
+        })
+      : await prisma.worker.findFirst({
+          where: {
+            OR: [
+              { code: { in: codeVariants } },
+              {
+                assignments: {
+                  some: { employeeCode: { in: codeVariants } },
+                },
+              },
+              {
+                bonusRecords: {
+                  some: { workerCode: { in: codeVariants } },
+                },
+              },
+            ],
+          },
+          include: includeConfig,
+        });
+
+    if (!worker) {
       return NextResponse.json(
         { success: false, message: "Thông tin tra cứu không khớp hồ sơ" },
         { status: 404 },
       );
+    }
+
+    // Nếu nhập cả CCCD và Mã NV thì kiểm tra khớp cả 2; nếu có lastPhone4 thì kiểm tra 4 số cuối SĐT
+    if (idCard && code) {
+      const normInput = code.trim().toLowerCase();
+      const codeMatchesWorker =
+        worker.code && worker.code.trim().toLowerCase() === normInput;
+      const codeMatchesAssignment = worker.assignments?.some(
+        (a) =>
+          a.employeeCode && a.employeeCode.trim().toLowerCase() === normInput,
+      );
+      const codeMatchesBonus = worker.bonusRecords?.some(
+        (b) =>
+          b.workerCode && b.workerCode.trim().toLowerCase() === normInput,
+      );
+      if (!codeMatchesWorker && !codeMatchesAssignment && !codeMatchesBonus) {
+        return NextResponse.json(
+          { success: false, message: "Số CCCD và Mã nhân viên không khớp cùng một hồ sơ" },
+          { status: 404 },
+        );
+      }
+    } else if (lastPhone4) {
+      if (!worker.phone || !phoneKey(worker.phone).endsWith(lastPhone4)) {
+        return NextResponse.json(
+          { success: false, message: "Thông tin tra cứu không khớp hồ sơ" },
+          { status: 404 },
+        );
+      }
     }
 
     const b = worker.bankAccounts[0];
@@ -129,8 +207,7 @@ export async function POST(request: NextRequest) {
         (r) =>
           r.assignmentId === a.id ||
           (r.company &&
-            (r.company === a.interviewFactory ||
-              r.company === a.workingFactory)),
+            r.company === a.interviewFactory),
       );
 
       const totalBonusFromRecords = linkedBonuses.reduce(
@@ -141,9 +218,8 @@ export async function POST(request: NextRequest) {
 
       return {
         id: a.id,
-        factory: a.workingFactory || a.interviewFactory,
+        factory: a.interviewFactory,
         interviewFactory: a.interviewFactory,
-        workingFactory: a.workingFactory,
         contractType: a.contractType || "Thời vụ",
         status: a.status,
         interviewDate: a.interviewDate || "—",
@@ -176,6 +252,12 @@ export async function POST(request: NextRequest) {
         success: true,
         data: {
           id: worker.id,
+          code:
+            worker.code ||
+            primaryAssignment?.employeeCode ||
+            worker.bonusRecords[0]?.workerCode ||
+            null,
+          idCardDisplay: worker.idCard,
           fullName: worker.fullName,
           phone: worker.phone
             ? worker.phone.slice(0, 3) + "••••" + worker.phone.slice(-3)
@@ -187,7 +269,6 @@ export async function POST(request: NextRequest) {
             ? {
                 status: primaryAssignment.status,
                 interviewFactory: primaryAssignment.interviewFactory,
-                workingFactory: primaryAssignment.workingFactory,
                 onboardingMonth: primaryAssignment.onboardingMonth,
               }
             : null,

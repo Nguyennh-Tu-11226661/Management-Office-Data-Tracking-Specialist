@@ -48,3 +48,34 @@ export function sourceRewardAmount(value: unknown) {
   if (/^(ko|không|hết|tặng)/i.test(s)) return 0;
   throw new Error("Nội dung thưởng chưa nhận diện: " + s);
 }
+
+const rewardHeaderCache = new Map<string, string>();
+function normalizedRewardHeader(key: string) {
+  const cached = rewardHeaderCache.get(key);
+  if (cached !== undefined) return cached;
+  const value = key.normalize("NFKC").toLocaleLowerCase("vi").normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "").replace(/\s+/g, " ").trim();
+  if (rewardHeaderCache.size >= 256) rewardHeaderCache.clear();
+  rewardHeaderCache.set(key, value);
+  return value;
+}
+
+// Split-format columns take precedence, including explicitly blank amounts.
+export function sourceRewardParts(row: Record<string, unknown>, stage: number) {
+  const normalized = new Map(Object.entries(row).map(([key, value]) => [
+    normalizedRewardHeader(key), value,
+  ]));
+  const splitKey = `tien thuong l${stage}`;
+  return {
+    split: normalized.has(splitKey),
+    name: String(normalized.get(`ten thuong l${stage}`) ?? "").trim(),
+    value: normalized.has(splitKey) ? normalized.get(splitKey) : normalized.get(`thuong lan ${stage}`),
+    reason: String(normalized.get(`ly do l${stage}`) ?? "").trim(),
+  };
+}
+export function sourceRewardText(row: Record<string, unknown>, stage: number) {
+  const part = sourceRewardParts(row, stage);
+  return part.split
+    ? [part.name, String(part.value ?? "").trim(), part.reason].filter(Boolean).join(" | ")
+    : String(part.value ?? "").trim();
+}

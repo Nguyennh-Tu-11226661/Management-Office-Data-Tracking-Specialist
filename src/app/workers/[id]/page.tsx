@@ -15,15 +15,13 @@ import {
   message,
   Alert,
 } from "antd";
-import { useIdentity } from "@/components/AuthGate";
 import AssignmentFields from "@/components/AssignmentFields";
 import DateField from "@/components/DateField";
 import { formatDate } from "@/lib/date-format";
 
 export default function WorkerDetailPage() {
   const { id } = useParams<{ id: string }>(),
-    user = useIdentity(),
-    canWrite = user?.permissions.includes("worker:write");
+    canWrite = true;
   const [worker, setWorker] = useState<any>(null),
     [edit, setEdit] = useState<any>(null),
     [statuses, setStatuses] = useState<any[]>([]),
@@ -124,9 +122,66 @@ export default function WorkerDetailPage() {
         />
       </Card>
 
+      {/* Hành trình lịch sử các công ty làm việc xuyên suốt */}
+      <Card
+        title={
+          <span className="font-bold text-slate-800 text-sm flex items-center gap-2">
+            <span>📅 Hành Trình Lịch Sử Các Công Ty / Đợt Tuyển Dụng Xuyên Suốt ({worker.assignments?.length || 0} đợt)</span>
+          </span>
+        }
+        className="shadow-xs border-slate-200"
+      >
+        <Timeline
+          className="mt-3"
+          items={[...(worker.assignments || [])]
+            .sort((x: any, y: any) => (x.interviewDate || "").localeCompare(y.interviewDate || ""))
+            .map((a: any, idx: number) => {
+              const fac = a.interviewFactory || "Chưa rõ công ty";
+              const isFail = a.interviewResult === "FAIL" || (a.status || "").toLowerCase().includes("trượt");
+              const isDrop = (a.status || "").toLowerCase().includes("bỏ") || a.interviewResult === "ABANDONED";
+              const isWorking = a.status === "Đang làm việc" || a.status === "LV";
+              const isEnded = !isWorking && (a.leaveDate || (a.status || "").toLowerCase().includes("nghỉ") || (a.status || "").toLowerCase().includes("hết"));
+              
+              const dotColor = isWorking ? "green" : isFail ? "red" : isDrop ? "gray" : isEnded ? "orange" : "blue";
+              
+              return {
+                color: dotColor,
+                children: (
+                  <div key={a.id} className="text-xs space-y-1 pb-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-bold text-slate-900 text-sm">
+                        Lượt {idx + 1}: {fac}
+                      </span>
+                      <Tag color={isWorking ? "success" : isFail ? "error" : isDrop ? "default" : "warning"} className="font-semibold text-[11px] m-0">
+                        {a.status || "Chưa rõ trạng thái"}
+                      </Tag>
+                      {a.interviewResult && (
+                        <span className="text-[11px] text-slate-500">
+                          Kết quả PV: <strong>{({ PASS: "Đỗ", FAIL: "Trượt", ABANDONED: "Bỏ", PENDING: "Chờ", UNKNOWN: "—" } as any)[a.interviewResult] || a.interviewResult}</strong>
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-slate-600 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+                      <span>Ngày PV: <strong>{formatDate(a.interviewDate)}</strong></span>
+                      {a.startDate && <span>Bắt đầu làm: <strong>{formatDate(a.startDate)}</strong></span>}
+                      {a.leaveDate && <span className="text-rose-600">Ngày nghỉ: <strong>{formatDate(a.leaveDate)}</strong></span>}
+                      {a.recruiter && <span>Tuyển dụng: <strong>{a.recruiter}</strong></span>}
+                      {a.employeeCode && <span>Mã NV: <strong>{a.employeeCode}</strong></span>}
+                    </div>
+                    {a.leaveReason && (
+                      <div className="text-[11px] text-rose-600 font-medium">
+                        Lý do kết thúc / chuyển xưởng: {a.leaveReason}
+                      </div>
+                    )}
+                  </div>
+                ),
+              };
+            })}
+        />
+      </Card>
+
       <h2 className="text-lg font-bold text-slate-800">
-        Lịch sử chi tiết các công ty đã làm việc (
-        {worker.assignments?.length || 0})
+        Chi tiết từng đợt làm việc ({worker.assignments?.length || 0})
       </h2>
 
       {worker.assignments.map((a: any, aIdx: number) => {
@@ -158,7 +213,7 @@ export default function WorkerDetailPage() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span>
                   Lượt {worker.assignments.length - aIdx}:{" "}
-                  <strong>{a.workingFactory || a.interviewFactory}</strong> ·{" "}
+                  <strong>{a.interviewFactory}</strong> ·{" "}
                   {a.order?.name || "Chưa gán đơn hàng"}
                 </span>
                 <div className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
@@ -235,6 +290,21 @@ export default function WorkerDetailPage() {
                       {a.status}
                     </Tag>
                   ),
+                },
+                {
+                  key: "shuttleBusKtx",
+                  label: "Đón xe + KTX",
+                  children: a.shuttleBusKtx || "—",
+                },
+                {
+                  key: "expectedTrainingDate",
+                  label: "Ngày đào tạo dự kiến",
+                  children: formatDate(a.expectedTrainingDate),
+                },
+                {
+                  key: "expectedTrainingStatus",
+                  label: "Tình trạng đào tạo",
+                  children: a.expectedTrainingStatus || "—",
                 },
                 {
                   key: "code",
@@ -375,11 +445,7 @@ export default function WorkerDetailPage() {
               province: "Quê quán/Tỉnh",
               address: "Địa chỉ",
               code: "Mã hồ sơ",
-              recruiter: "Tuyển dụng",
-              team: "Đội nhóm",
               source: "Nguồn tuyển dụng",
-              interviewFactory: "Nhà máy PV",
-              workingFactory: "Nhà máy làm việc",
               contractType: "Loại hợp đồng",
               shuttleBusKtx: "Đón xe / KTX",
               interviewDate: "Ngày PV",
@@ -406,13 +472,6 @@ export default function WorkerDetailPage() {
               </Form.Item>
             ))}
           </div>
-          <Form.Item name="status" label="Trạng thái">
-            <Select
-              options={statuses
-                .filter((s) => s.isActive)
-                .map((s) => ({ value: s.name, label: s.name }))}
-            />
-          </Form.Item>
           <AssignmentFields form={form} showWorkDays />
           <Form.Item
             name="eventDate"

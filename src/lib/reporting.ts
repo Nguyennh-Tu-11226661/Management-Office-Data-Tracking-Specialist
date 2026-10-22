@@ -1,5 +1,6 @@
 import { monthOf, today } from "@/lib/domain";
 import { dateKey } from "@/lib/worker-validation";
+import { provinceName } from "@/lib/province-name";
 
 export function matchesAssignment(a: any, p: URLSearchParams) {
   const d = a.interviewDate ? dateKey(a.interviewDate) : null;
@@ -15,16 +16,30 @@ export function matchesAssignment(a: any, p: URLSearchParams) {
 
   return (
     (!p.get("month") || monthOf(a.interviewDate) === p.get("month")) &&
-    // Lọc Nhà máy làm việc/PV (Multi-select)
+    // Lọc Nhà máy PV (Multi-select)
     (!p.get("factory") ||
-      matchMulti("factory", a.workingFactory || a.interviewFactory)) &&
+      matchMulti("factory", a.interviewFactory)) &&
     // Lọc Nhà máy PV (Multi-select)
     (!p.get("interviewFactory") ||
       matchMulti("interviewFactory", a.interviewFactory)) &&
     // Lọc Đơn hàng (Multi-select)
     (!p.get("orderId") || matchMulti("orderId", a.orderId)) &&
-    // Lọc Đợt tuyển (Multi-select)
-    (!p.get("batchId") || matchMulti("batchId", a.batchId)) &&
+    // Lọc Đợt tuyển (Multi-select theo mã kỳ T01.2026..T12.2026 hoặc batchId)
+    (!p.get("batchId") ||
+      p
+        .get("batchId")!
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .some((item) => {
+          if (String(a.batchId || "").trim() === item) return true;
+          if (String(a.batch?.periodMonth || "").trim() === item) return true;
+          const m = /^T(0[1-9]|1[0-2])\.(\d{4})$/i.exec(item);
+          if (m) {
+            return monthOf(a.interviewDate) === `${m[2]}-${m[1]}`;
+          }
+          return false;
+        })) &&
     // Lọc Người tuyển dụng (Multi-select)
     (!p.get("recruiter") || matchMulti("recruiter", a.recruiter)) &&
     // Lọc Đội nhóm (Multi-select)
@@ -90,8 +105,8 @@ export function recruitmentReport(workers: any[], p: URLSearchParams) {
           dateKey(old.interviewDate || "") &&
           dateKey(old.interviewDate)! < d &&
           (!factoryOnly ||
-            (old.workingFactory || old.interviewFactory) ===
-              (a.workingFactory || a.interviewFactory)),
+            (old.interviewFactory) ===
+              (a.interviewFactory)),
       )
     );
   }
@@ -223,8 +238,8 @@ export function recruitmentReport(workers: any[], p: URLSearchParams) {
       const w = a.worker;
       genders[w.gender || "Chưa xác định"] =
         (genders[w.gender || "Chưa xác định"] || 0) + 1;
-      provinces[w.province || "Chưa xác định"] =
-        (provinces[w.province || "Chưa xác định"] || 0) + 1;
+      const province = provinceName(w.province, w.address) || "Chưa xác định";
+      provinces[province] = (provinces[province] || 0) + 1;
       const birth = dateKey(w.dob || ""),
         reference = dateKey(a.interviewDate || "");
       let label = "Chưa xác định";
@@ -262,12 +277,12 @@ export function recruitmentReport(workers: any[], p: URLSearchParams) {
   };
   const factories = group((a) => a.interviewFactory),
     companies = [
-      ...new Set(rows.map((a) => a.workingFactory || a.interviewFactory)),
+      ...new Set(rows.map((a) => a.interviewFactory)),
     ].map((factory) => ({
       factory,
       ...demographics(
         rows.filter(
-          (a) => (a.workingFactory || a.interviewFactory) === factory,
+          (a) => (a.interviewFactory) === factory,
         ),
       ),
     }));

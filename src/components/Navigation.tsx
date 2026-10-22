@@ -1,6 +1,5 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { useIdentity } from '@/components/AuthGate';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -13,7 +12,6 @@ import {
   Truck,
   FileSpreadsheet,
   History,
-  Shield,
   Coins,
   CreditCard,
   Award,
@@ -25,7 +23,6 @@ import {
   ShieldAlert,
   Menu,
   X,
-  LogOut,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -48,7 +45,7 @@ const navGroups: NavGroup[] = [
     group: 'BÁO CÁO & KPI',
     items: [
       { href: '/', label: 'Tổng quan Dashboard', icon: LayoutDashboard },
-      { href: '/workers', label: 'Hồ sơ lao động (DS_TONG)', icon: FileText },
+      { href: '/workers', label: 'Hồ sơ lao động', icon: FileText },
       { href: '/performance', label: 'Đánh giá & So sánh KPI', icon: TrendingUp },
       { href: '/orders', label: 'Đơn hàng & đợt tuyển', icon: Target },
       { href: '/duplicates', label: 'Cảnh báo trùng lặp', icon: ShieldAlert },
@@ -58,7 +55,7 @@ const navGroups: NavGroup[] = [
   {
     group: 'CHÍNH SÁCH & THƯỞNG',
     items: [
-      { href: '/bonuses', label: 'Quản lý Thưởng (DS_THUONG)', icon: Coins },
+      { href: '/bonuses', label: 'Quản lí thưởng', icon: Coins },
       { href: '/rewards', label: 'Mốc thưởng / Đã trả', icon: Award },
       { href: '/bank-accounts', label: 'Tài chính & STK 2026', icon: CreditCard },
       { href: '/policies', label: 'Chính sách thưởng', icon: SlidersHorizontal },
@@ -68,10 +65,8 @@ const navGroups: NavGroup[] = [
     group: 'HỆ THỐNG & CÔNG CỤ',
     items: [
       { href: '/excel-tools', label: 'Bộ máy Excel Engine', icon: FileSpreadsheet },
-      { href: '/import-review', label: 'Cảnh báo / Trùng import', icon: ShieldAlert },
       { href: '/catalogs', label: 'Danh mục cấu hình', icon: Layers },
       { href: '/audit', label: 'Lịch sử thay đổi', icon: History },
-      { href: '/permissions', label: 'Phân quyền & Tài khoản', icon: Shield },
     ],
   },
 ];
@@ -79,11 +74,11 @@ const navGroups: NavGroup[] = [
 const TAB_TITLES: Record<string, { title: string; subtitle?: string }> = {
   '/': { title: 'Tổng quan Dashboard', subtitle: 'Báo cáo tiến độ và công suất phễu tuyển dụng toàn công ty' },
   '/performance': { title: 'Đánh giá & So sánh KPI', subtitle: 'So sánh hiệu suất tuyển dụng theo Team & Chuyên viên và phân tích chân dung người lao động' },
-  '/workers': { title: 'Hồ sơ lao động (DS_TONG)', subtitle: 'Kiểm tra hồ sơ và xuất dữ liệu đang lọc' },
+  '/workers': { title: 'Hồ sơ lao động', subtitle: 'Kiểm tra hồ sơ và xuất dữ liệu đang lọc' },
   '/orders': { title: 'Đơn hàng & đợt tuyển', subtitle: 'Theo dõi tiến độ đơn hàng và chỉ tiêu theo từng nhà máy' },
   '/duplicates': { title: 'Cảnh báo trùng lặp', subtitle: 'Phát hiện ứng viên trùng CCCD, SĐT hoặc nghỉ việc quay lại' },
   '/lookup': { title: 'Tra cứu người LĐ', subtitle: 'Giải mã tự động và tra cứu hồ sơ cá nhân theo CCCD 12 số' },
-  '/bonuses': { title: 'Quản lý Thưởng (DS_THUONG)', subtitle: 'Ghi nhận và xét duyệt 7 khoản thưởng theo chính sách' },
+  '/bonuses': { title: 'Quản lí thưởng', subtitle: 'Ghi nhận và xét duyệt 7 khoản thưởng theo chính sách' },
   '/rewards': { title: 'Mốc thưởng & Đã trả', subtitle: 'Tiến độ mốc công yêu cầu và ghi nhận chứng từ thanh toán' },
   '/bank-accounts': { title: 'Tài chính & STK 2026', subtitle: 'Đối chiếu số tài khoản ngân hàng và kiểm soát rủi ro lệch tên' },
   '/policies': { title: 'Chính sách thưởng', subtitle: 'Quy chế thưởng công nhân theo nhà máy và đơn hàng' },
@@ -91,12 +86,10 @@ const TAB_TITLES: Record<string, { title: string; subtitle?: string }> = {
   '/excel-tools': { title: 'Bộ máy Excel Engine', subtitle: 'Nhập xuất dữ liệu DS_TONG, lệnh chi ngân hàng và cảnh báo trùng' },
   '/catalogs': { title: 'Danh mục cấu hình', subtitle: 'Thiết lập danh mục nhà máy, team và trạng thái lao động' },
   '/audit': { title: 'Lịch sử thay đổi', subtitle: 'Nhật ký kiểm toán toàn bộ thao tác thêm, sửa, xóa, duyệt' },
-  '/permissions': { title: 'Phân quyền & Tài khoản', subtitle: 'Quản lý vai trò người dùng và bảo mật hệ thống' },
 };
 
 export default function Navigation({ children }: { children?: React.ReactNode }) {
   const pathname = usePathname();
-  const user = useIdentity();
   const [isOpenMobile, setIsOpenMobile] = useState(false);
   const [isOtherModulesOpen, setIsOtherModulesOpen] = useState(false);
 
@@ -109,14 +102,6 @@ export default function Navigation({ children }: { children?: React.ReactNode })
     subtitle: 'Hệ thống Quản trị Lao động Tri Thức Việt 2026',
   };
 
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      window.location.assign('/');
-    } catch {
-      window.location.assign('/');
-    }
-  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -157,9 +142,7 @@ export default function Navigation({ children }: { children?: React.ReactNode })
         {/* Navigation list */}
         <div className="flex-1 overflow-y-auto px-3 py-4 text-xs font-medium text-slate-600">
           {navGroups.map((group) => {
-            const visibleItems = user
-              ? group.items
-              : group.items.filter((i) => i.href === '/lookup');
+            const visibleItems = group.items;
 
             if (visibleItems.length === 0) return null;
 
@@ -260,14 +243,14 @@ export default function Navigation({ children }: { children?: React.ReactNode })
             {/* Right side: Sync info & Profile */}
             <div className="flex items-center gap-3 text-xs shrink-0">
               {/* Nút Nhập dữ liệu thật (Excel/CSV) dẫn tới Excel Engine */}
-              <Link
+              {pathname !== "/excel-tools" && <Link
                 href="/excel-tools"
                 className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 shadow-xs transition"
                 title="Mở bộ máy xử lý và nạp file Excel"
               >
                 <CheckCircle2 className="h-4 w-4" />
                 <span>Nhập Excel/CSV</span>
-              </Link>
+              </Link>}
 
               {/* Sync status */}
               <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 xl:flex">
@@ -282,26 +265,7 @@ export default function Navigation({ children }: { children?: React.ReactNode })
                 <span className="font-medium text-emerald-600">Đã kết nối CSDL</span>
               </div>
 
-              {/* User profile */}
-              {user ? (
-                <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700 text-xs">
-                    {user.username.slice(0, 3).toUpperCase()}
-                  </div>
-                  <div className="hidden sm:block text-left">
-                    <div className="text-xs font-semibold text-slate-800">{user.username}</div>
-                    <div className="text-[10px] text-slate-400">{user.role}</div>
-                  </div>
-                  {!user.localAutoView&&<button
-                    onClick={handleLogout}
-                    className="ml-1 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
-                    title="Đăng xuất"
-                  >
-                    <LogOut className="h-4 w-4" />
-                  </button>}
-                </div>
-              ) : (null
-              )}
+              <span className="text-xs text-slate-500">Dùng trên máy này</span>
             </div>
           </div>
         </header>

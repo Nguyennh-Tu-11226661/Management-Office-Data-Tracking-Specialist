@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import {
   Card,
   Table,
@@ -16,8 +16,8 @@ import {
   message,
   Tooltip,
 } from "antd";
+import SourcePaidRowsTable from "./SourcePaidRowsTable";
 import OverviewCharts from "@/components/OverviewCharts";
-import { useIdentity } from "@/components/AuthGate";
 import DateField from "@/components/DateField";
 import { formatDate } from "@/lib/date-format";
 import Link from "next/link";
@@ -43,13 +43,13 @@ import {
   TrendingUp,
   HelpCircle,
   Info,
+  ChevronRight,
 } from "lucide-react";
 
 const pct = (n: number | null | undefined) => (n == null ? "—" : `${n}%`);
 const money = (n: number) => (n || 0).toLocaleString("vi-VN") + " ₫";
 
 export default function OverviewPage() {
-  const user = useIdentity();
   const [data, setData] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [catalogs, setCatalogs] = useState<any[]>([]);
@@ -66,8 +66,12 @@ export default function OverviewPage() {
 
   const [busy, setBusy] = useState(false);
   const [tableSearch, setTableSearch] = useState("");
+  const [appliedFilters, setAppliedFilters] = useState<Record<string, unknown>>({});
+  const reportRequest = useRef<AbortController | null>(null);
 
   async function load() {
+    reportRequest.current?.abort();
+    const controller = new AbortController(); reportRequest.current = controller;
     setBusy(true);
     try {
       const params = new URLSearchParams();
@@ -83,18 +87,21 @@ export default function OverviewPage() {
         }
       });
 
-      const res = await fetch(`/api/reports?${params.toString()}`);
+      params.set("view", "overview");
+      const res = await fetch(`/api/reports?${params.toString()}`, { signal: controller.signal, cache: "no-store" });
       const j = await res.json();
+      if (controller.signal.aborted) return;
 
       if (j.success) {
         setData(j.data);
+        setAppliedFilters(filters);
       } else {
         message.error(j.message || "Không tải được báo cáo");
       }
     } catch {
-      message.error("Lỗi khi tải dữ liệu báo cáo");
+      if (!controller.signal.aborted) message.error("Lỗi khi tải dữ liệu báo cáo");
     } finally {
-      setBusy(false);
+      if (reportRequest.current === controller) setBusy(false);
     }
   }
 
@@ -115,6 +122,8 @@ export default function OverviewPage() {
     const timer = setInterval(() => load(), 60000);
     return () => clearInterval(timer);
   }, [filters]);
+
+  useEffect(() => () => { reportRequest.current?.abort(); }, []);
 
   // 1. Cập nhật hàm set để nhận cả string và mảng string[]
   const set = (key: string, value: any) =>
@@ -155,22 +164,48 @@ export default function OverviewPage() {
         label: "Đến ngày",
         value: formatDate(filters.to),
       });
-    if (filters.interviewFactory)
+    if (
+      Array.isArray(filters.interviewFactory)
+        ? filters.interviewFactory.length > 0
+        : Boolean(filters.interviewFactory)
+    )
       list.push({
         key: "interviewFactory",
         label: "Nhà máy",
-        value: filters.interviewFactory,
+        value: Array.isArray(filters.interviewFactory)
+          ? filters.interviewFactory.join(", ")
+          : String(filters.interviewFactory),
       });
-    if (filters.orderId) {
-      const o = orders.find((ord) => ord.id === filters.orderId);
+    if (
+      Array.isArray(filters.orderId)
+        ? filters.orderId.length > 0
+        : Boolean(filters.orderId)
+    ) {
+      const selectedOrderIds = Array.isArray(filters.orderId)
+        ? filters.orderId
+        : [filters.orderId];
+      const names = selectedOrderIds.map((id) => {
+        const o = orders.find((ord) => ord.id === id);
+        return o ? o.name : id;
+      });
       list.push({
         key: "orderId",
         label: "Đơn hàng",
-        value: o ? o.name : filters.orderId,
+        value: names.join(", "),
       });
     }
-    if (filters.batchId) {
-      list.push({ key: "batchId", label: "Đợt tuyển", value: filters.batchId });
+    if (
+      Array.isArray(filters.batchId)
+        ? filters.batchId.length > 0
+        : Boolean(filters.batchId)
+    ) {
+      list.push({
+        key: "batchId",
+        label: "Đợt tuyển",
+        value: Array.isArray(filters.batchId)
+          ? filters.batchId.join(", ")
+          : String(filters.batchId),
+      });
     }
     return list;
   }, [filters, orders]);
@@ -488,6 +523,14 @@ export default function OverviewPage() {
           >
             Làm Mới
           </Button>
+          <Link href="/bonuses">
+            <Button
+              className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border-amber-400/40 hover:border-amber-400/60 font-semibold"
+              icon={<Coins className="w-4 h-4 text-amber-300" />}
+            >
+              Quản Lý Thưởng (DS_THUONG)
+            </Button>
+          </Link>
           <Link href="/excel-tools">
             <Button
               className="bg-white/10 hover:bg-white/20 text-white border-white/20 hover:border-white/40"
@@ -699,50 +742,91 @@ export default function OverviewPage() {
               placeholder="Tất cả đợt tuyển (T01 - T10)"
               value={Array.isArray(filters.batchId) ? filters.batchId : []}
               onChange={(selectedValues) => {
-                const availableBatches = orders
-                  .filter((o) => {
-                    const selectedOrders = Array.isArray(filters.orderId)
-                      ? filters.orderId
-                      : [];
-                    return (
-                      selectedOrders.length === 0 ||
-                      selectedOrders.includes(o.id)
-                    );
-                  })
-                  .flatMap((o) => o.batches.map((b: any) => b.id));
+                const selectedFactories = Array.isArray(
+                  filters.interviewFactory,
+                )
+                  ? filters.interviewFactory
+                  : [];
+                const selectedOrders = Array.isArray(filters.orderId)
+                  ? filters.orderId
+                  : [];
+                const availablePeriods = Array.from(
+                  new Set(
+                    orders
+                      .filter(
+                        (o) =>
+                          (selectedFactories.length === 0 ||
+                            selectedFactories.includes(o.factory)) &&
+                          (selectedOrders.length === 0 ||
+                            selectedOrders.includes(o.id)),
+                      )
+                      .flatMap((o) =>
+                        (o.batches || []).map(
+                          (b: any) => b.periodMonth || b.name,
+                        ),
+                      )
+                      .filter(Boolean),
+                  ),
+                );
 
                 if (selectedValues.includes("ALL")) {
                   const currentList = Array.isArray(filters.batchId)
                     ? filters.batchId
                     : [];
-                  if (currentList.length === availableBatches.length) {
+                  if (currentList.length === availablePeriods.length) {
                     set("batchId", []);
                   } else {
-                    set("batchId", availableBatches);
+                    set("batchId", availablePeriods);
                   }
                 } else {
                   set("batchId", selectedValues);
                 }
               }}
               options={(() => {
+                const selectedFactories = Array.isArray(
+                  filters.interviewFactory,
+                )
+                  ? filters.interviewFactory
+                  : [];
                 const selectedOrders = Array.isArray(filters.orderId)
                   ? filters.orderId
                   : [];
-                const batchOptions = orders
-                  .filter(
-                    (o) =>
-                      selectedOrders.length === 0 ||
-                      selectedOrders.includes(o.id),
+                const matchingOrders = orders.filter(
+                  (o) =>
+                    (selectedFactories.length === 0 ||
+                      selectedFactories.includes(o.factory)) &&
+                    (selectedOrders.length === 0 ||
+                      selectedOrders.includes(o.id)),
+                );
+                const periodMap = new Map<
+                  string,
+                  { period: string; target: number; count: number }
+                >();
+                for (const o of matchingOrders) {
+                  for (const b of o.batches || []) {
+                    const period = String(b.periodMonth || b.name || "").trim();
+                    if (!period) continue;
+                    const cur = periodMap.get(period) || {
+                      period,
+                      target: 0,
+                      count: 0,
+                    };
+                    if (b.target) cur.target += Number(b.target);
+                    cur.count += 1;
+                    periodMap.set(period, cur);
+                  }
+                }
+                const batchOptions = Array.from(periodMap.values())
+                  .sort((a, b) =>
+                    a.period.localeCompare(b.period, "vi", { numeric: true }),
                   )
-                  .flatMap((o) =>
-                    o.batches.map((b: any) => ({
-                      value: b.id,
-                      label:
-                        selectedOrders.length === 1
-                          ? `${b.periodMonth || b.name} (Chỉ tiêu: ${b.target ? b.target.toLocaleString("vi-VN") : "N/A"})`
-                          : `${o.factory} · ${b.periodMonth || b.name} (Chỉ tiêu: ${b.target ? b.target.toLocaleString("vi-VN") : "N/A"})`,
-                    })),
-                  );
+                  .map((item) => ({
+                    value: item.period,
+                    label:
+                      matchingOrders.length === 1 && item.target > 0
+                        ? `Đợt ${item.period} (Chỉ tiêu: ${item.target.toLocaleString("vi-VN")})`
+                        : `Đợt ${item.period}`,
+                  }));
                 return [
                   { value: "ALL", label: "--- Chọn tất cả ---" },
                   ...batchOptions,
@@ -880,12 +964,16 @@ export default function OverviewPage() {
             </div>
 
             {/* 5. Lao Động Quay Lại */}
-            <div className="p-4 rounded-xl bg-white border border-cyan-100 shadow-xs hover:shadow-md transition-all">
+            <Link
+              href="/workers?returning=true"
+              className="block p-4 rounded-xl bg-white border border-cyan-100 shadow-xs hover:shadow-md transition-all group cursor-pointer"
+              title="Bấm để xem danh sách người lao động tái ký / quay lại"
+            >
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-slate-500">
+                <span className="text-xs font-semibold text-slate-500 group-hover:text-cyan-700 transition">
                   Lao Động Quay Lại
                 </span>
-                <div className="w-8 h-8 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-cyan-50 group-hover:bg-cyan-100 text-cyan-600 flex items-center justify-center transition">
                   <RotateCcw className="w-4 h-4" />
                 </div>
               </div>
@@ -896,97 +984,139 @@ export default function OverviewPage() {
                 <Tag color="cyan" className="text-[11px] font-semibold m-0">
                   {returnRate}%
                 </Tag>
-                <span>tỷ lệ tái ký</span>
+                <span>tỷ lệ tái ký (Bấm xem DS)</span>
               </div>
-            </div>
+            </Link>
           </div>
 
           {/* NHÓM B: TÀI CHÍNH & DÒNG TIỀN THƯỞNG (ĐÃ ĐỒNG BỘ NGUỒN EXCEL) */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-2 mb-2">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+              <Coins className="w-3.5 h-3.5 text-amber-600" />
+              <span>Tài chính & Dòng tiền thưởng (Theo DS_THUONG)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/bonuses"
+                className="text-xs font-semibold text-amber-700 hover:text-amber-800 flex items-center gap-1 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-200 transition"
+              >
+                <Coins className="w-3.5 h-3.5 text-amber-600" />
+                <span>Mở Quản Lý Thưởng (DS_THUONG)</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+              <Link
+                href="/rewards"
+                className="text-xs font-semibold text-purple-700 hover:text-purple-800 flex items-center gap-1 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-lg border border-purple-200 transition"
+              >
+                <Award className="w-3.5 h-3.5 text-purple-600" />
+                <span>Mốc thưởng / Đã trả</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Tiền Đạt Mốc */}
-            <div className="p-4 rounded-xl bg-white border border-purple-100 shadow-xs hover:shadow-md transition-all">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-slate-500">
-                  Tiền Đạt Mốc Thưởng
-                </span>
-                <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-                  <Award className="w-4 h-4" />
+            <Link href="/rewards" className="block group">
+              <div className="p-4 rounded-xl bg-white border border-purple-100 shadow-xs group-hover:border-purple-300 group-hover:shadow-md transition-all h-full flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-purple-700 transition">
+                      Tiền Đạt Mốc Thưởng
+                    </span>
+                    <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition">
+                      <Award className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-purple-700 tracking-tight">
+                    {money(earnedMoney)}
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-slate-500 flex items-center justify-between">
+                  {rewSummary.achieved > 0 ? (
+                    <span>
+                      {rewSummary.achieved} / {rewSummary.eligible} mốc đạt tiêu
+                      chuẩn ({pct(rewSummary.achieveRate)})
+                    </span>
+                  ) : (
+                    <span className="text-purple-600 font-medium">
+                      Hạch toán từ{" "}
+                      {(sourcePaid?.rowCount ?? sourcePaid?.rows?.length ?? 0).toLocaleString("vi-VN")}{" "}
+                      lượt chi thưởng DS_THUONG
+                    </span>
+                  )}
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-purple-600 transition" />
                 </div>
               </div>
-              <div className="text-2xl font-black text-purple-700 tracking-tight">
-                {money(earnedMoney)}
-              </div>
-              <div className="mt-1 text-xs text-slate-500">
-                {rewSummary.achieved > 0 ? (
-                  <span>
-                    {rewSummary.achieved} / {rewSummary.eligible} mốc đạt tiêu
-                    chuẩn ({pct(rewSummary.achieveRate)})
-                  </span>
-                ) : (
-                  <span className="text-purple-600 font-medium">
-                    Hạch toán từ{" "}
-                    {sourcePaid?.rows?.length?.toLocaleString("vi-VN") || 0}{" "}
-                    lượt chi thưởng DS_THUONG
-                  </span>
-                )}
-              </div>
-            </div>
+            </Link>
 
             {/* Thực Tế Đã Chi Trả */}
-            <div className="p-4 rounded-xl bg-white border border-emerald-100 shadow-xs hover:shadow-md transition-all">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-slate-500">
-                  Thực Tế Đã Chi Trả
-                </span>
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                  <Coins className="w-4 h-4" />
+            <Link href="/bonuses" className="block group">
+              <div className="p-4 rounded-xl bg-white border border-emerald-100 shadow-xs group-hover:border-emerald-300 group-hover:shadow-md transition-all h-full flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-emerald-700 transition">
+                      Thực Tế Đã Chi Trả
+                    </span>
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition">
+                      <Coins className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-emerald-700 tracking-tight">
+                    {money(paidMoney)}
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-slate-500 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Tag color="green" className="text-[11px] font-semibold m-0">
+                      {payRate}% Đã giải ngân
+                    </Tag>
+                    {sourcePaidMoney > 0 && (
+                      <span className="text-emerald-700 font-medium">
+                        (Đồng bộ file DS_THUONG)
+                      </span>
+                    )}
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 transition" />
                 </div>
               </div>
-              <div className="text-2xl font-black text-emerald-700 tracking-tight">
-                {money(paidMoney)}
-              </div>
-              <div className="mt-1 text-xs text-slate-500 flex items-center gap-1.5">
-                <Tag color="green" className="text-[11px] font-semibold m-0">
-                  {payRate}% Đã giải ngân
-                </Tag>
-                {sourcePaidMoney > 0 && (
-                  <span className="text-emerald-700 font-medium">
-                    (Đồng bộ file DS_THUONG)
-                  </span>
-                )}
-              </div>
-            </div>
+            </Link>
 
             {/* Còn Phải Trả */}
-            <div className="p-4 rounded-xl bg-white border border-amber-100 shadow-xs hover:shadow-md transition-all">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-slate-500">
-                  Dư Nợ Còn Phải Trả
-                </span>
-                <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-                  <Clock className="w-4 h-4" />
+            <Link href="/rewards" className="block group">
+              <div className="p-4 rounded-xl bg-white border border-amber-100 shadow-xs group-hover:border-amber-300 group-hover:shadow-md transition-all h-full flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-amber-700 transition">
+                      Dư Nợ Còn Phải Trả
+                    </span>
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-amber-700 tracking-tight">
+                    {money(outstandingMoney)}
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-slate-500 flex items-center justify-between">
+                  {outstandingMoney > 0 ? (
+                    <span className="text-amber-600 font-medium">
+                      Cần chuẩn bị kế hoạch thanh toán
+                    </span>
+                  ) : (
+                    <span className="text-slate-400">Không có dư nợ quá hạn</span>
+                  )}
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-600 transition" />
                 </div>
               </div>
-              <div className="text-2xl font-black text-amber-700 tracking-tight">
-                {money(outstandingMoney)}
-              </div>
-              <div className="mt-1 text-xs text-slate-500">
-                {outstandingMoney > 0 ? (
-                  <span className="text-amber-600 font-medium">
-                    Cần chuẩn bị kế hoạch thanh toán
-                  </span>
-                ) : (
-                  <span className="text-slate-400">Không có dư nợ quá hạn</span>
-                )}
-              </div>
-            </div>
+            </Link>
           </div>
         </div>
       )}
 
       {/* 4. ĐỐI CHIẾU NGUỒN EXCEL (CHỈ HIỂN THỊ KHI CÓ DỮ LIỆU NGUỒN) */}
       {sourcePaid &&
-        (sourcePaid.total > 0 || (sourcePaid.rows || []).length > 0) && (
+        (sourcePaid.total > 0 || (sourcePaid.rowCount ?? sourcePaid.rows?.length ?? 0) > 0) && (
           <Card
             title={
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-1">
@@ -1002,37 +1132,49 @@ export default function OverviewPage() {
                     </span>
                   </div>
                 </div>
-                <Tag
-                  color="cyan"
-                  className="text-sm font-bold px-3 py-1 rounded-lg"
-                >
-                  Tổng tiền đã chi: {money(sourcePaid.total)}
-                </Tag>
+                <div className="flex items-center gap-2">
+                  <Tag
+                    color="cyan"
+                    className="text-sm font-bold px-3 py-1 rounded-lg"
+                  >
+                    Tổng tiền đã chi: {money(sourcePaid.total)}
+                  </Tag>
+                  <Link
+                    href="/bonuses"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs transition"
+                  >
+                    <Coins className="w-3.5 h-3.5" />
+                    <span>Mở Quản Lý Thưởng (DS_THUONG)</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </Link>
+                </div>
               </div>
             }
             className="border-slate-200 shadow-xs rounded-2xl"
           >
             {/* Hộp giải thích rõ ràng, thân thiện cho người dùng */}
-            <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3.5 mb-4 text-xs space-y-1.5">
+            <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3.5 mb-4 text-xs space-y-2">
               <div className="font-bold text-blue-900 flex items-center gap-1.5 text-sm">
                 <CheckCircle2 className="w-4 h-4 text-blue-600" />
-                Toàn bộ số tiền thưởng {money(sourcePaid.total)} đã được ghi
-                nhận và đồng bộ vào hệ thống
+                Toàn bộ số tiền thưởng {money(sourcePaid.total)} đã được ghi nhận và đồng bộ đầy đủ vào hệ thống
               </div>
               <p className="text-slate-600 m-0 leading-relaxed">
-                • <b>Số lượt nhận thưởng</b>: Tổng số dòng chi thưởng tương ứng
-                với các lao động nhận thưởng tại từng nhà máy.
-                <br />•{" "}
-                <b>
-                  Chưa khớp ngày PV/Mã NV (
-                  {sourcePaid.unlinked?.toLocaleString("vi-VN") || 0} lượt)
-                </b>
-                : Tiền thưởng{" "}
-                <b>đã được hạch toán đầy đủ vào tổng tiền đã trả</b>. Trạng thái
-                này chỉ báo hiệu trên file thưởng ngày PV hoặc mã NV có độ lệch
-                nhỏ so với ngày đăng ký ban đầu trong file <code>DS_TONG</code>,
-                hoàn toàn không làm mất hay sai lệch tiền thưởng.
+                • <b>Số lượt nhận thưởng</b>: Tổng số lượt chi thưởng tương ứng với các lao động nhận thưởng tại từng nhà máy.
+                <br />• <b>Thực tế đã chi trả</b>: Toàn bộ số tiền thưởng đã được hạch toán đầy đủ và chính xác cho người lao động.
               </p>
+              <div className="pt-2 border-t border-blue-200/70 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-slate-600">
+                  👉 Xem danh sách chi tiết từng lao động, trạng thái tài khoản ngân hàng hoặc xuất lệnh chi tiền thưởng:
+                </span>
+                <Link
+                  href="/bonuses"
+                  className="inline-flex items-center gap-1 font-bold text-blue-700 hover:text-blue-900 bg-white hover:bg-blue-50 px-2.5 py-1 rounded-md border border-blue-300 transition"
+                >
+                  <Coins className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Đi đến Trang Quản lý Thưởng</span>
+                  <ExternalLink className="w-3 h-3" />
+                </Link>
+              </div>
             </div>
 
             <Tabs
@@ -1068,32 +1210,6 @@ export default function OverviewPage() {
                       ),
                     },
                     {
-                      title: "Khớp hồ sơ DS_TONG",
-                      key: "matched",
-                      render: (_: any, r: any) => {
-                        const matched = (r.rows || 0) - (r.unlinked || 0);
-                        return (
-                          <Tooltip title="Khớp chính xác cả CCCD, nhà máy và ngày PV với hồ sơ DS_TONG">
-                            <Tag color={matched > 0 ? "green" : "default"}>
-                              {matched.toLocaleString("vi-VN")} lượt khớp
-                            </Tag>
-                          </Tooltip>
-                        );
-                      },
-                    },
-                    {
-                      title: "Chưa khớp ngày PV / Mã NV",
-                      dataIndex: "unlinked",
-                      key: "unlinked",
-                      render: (n: number) => (
-                        <Tooltip title="Tiền thưởng đã được tính đầy đủ vào tổng tiền, nhưng ngày PV hoặc mã NV trong file thưởng lệch một chút so với hồ sơ DS_TONG">
-                          <Tag color={n > 0 ? "orange" : "default"}>
-                            {n.toLocaleString("vi-VN")} chưa khớp ngày
-                          </Tag>
-                        </Tooltip>
-                      ),
-                    },
-                    {
                       title: "Cần kiểm tra số tiền",
                       dataIndex: "pending",
                       key: "pending",
@@ -1108,48 +1224,8 @@ export default function OverviewPage() {
                 },
                 {
                   key: "sourceRows",
-                  label: `Danh Sách Chi Tiết Từng Lượt Nhận Thưởng (${sourcePaid.rows?.length || 0})`,
-                  children: renderTable(sourcePaid.rows, [
-                    { title: "Người lao động", dataIndex: "name", key: "name" },
-                    { title: "Số CCCD", dataIndex: "idCard", key: "idCard" },
-                    { title: "Công ty", dataIndex: "company", key: "company" },
-                    { title: "Tháng thưởng", dataIndex: "month", key: "month" },
-                    {
-                      title: "Đã chi trả",
-                      dataIndex: "paid",
-                      key: "paid",
-                      render: money,
-                    },
-                    {
-                      title: "Ngày PV ghi nhận",
-                      dataIndex: "interviewDate",
-                      key: "interviewDate",
-                    },
-                    {
-                      title: "Chính sách thưởng",
-                      dataIndex: "policy",
-                      key: "policy",
-                    },
-                    {
-                      title: "Trạng thái khớp hồ sơ",
-                      dataIndex: "status",
-                      key: "status",
-                      render: (st: string) => (
-                        <Tag
-                          color={
-                            st.includes("Đã liên kết") ? "green" : "orange"
-                          }
-                        >
-                          {st}
-                        </Tag>
-                      ),
-                    },
-                    {
-                      title: "Chi tiết các lần thưởng 1 → 7",
-                      dataIndex: "sourceRewards",
-                      key: "sourceRewards",
-                    },
-                  ]),
+                  label: `Danh Sách Chi Tiết Từng Lượt Nhận Thưởng (${sourcePaid.rowCount ?? sourcePaid.rows?.length ?? 0})`,
+                  children: <SourcePaidRowsTable filters={appliedFilters} search={tableSearch} />,
                 },
               ]}
             />
@@ -1324,8 +1400,25 @@ export default function OverviewPage() {
                   </span>
                 ),
                 children: (
-                  <Tabs
-                    type="card"
+                  <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-amber-50/70 p-3 rounded-xl border border-amber-200">
+                      <div className="text-xs text-amber-900 flex items-center gap-1.5 font-medium">
+                        <Coins className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>
+                          Dữ liệu chi thưởng các lần 1 → 7 tổng hợp từ bảng tính <strong>DS_THUONG</strong>.
+                        </span>
+                      </div>
+                      <Link
+                        href="/bonuses"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs transition shrink-0"
+                      >
+                        <Coins className="w-3.5 h-3.5" />
+                        <span>Vào trang Quản Lý Thưởng Chi Tiết</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                    <Tabs
+                      type="card"
                     items={[
                       {
                         key: "bCompanies",
@@ -1373,6 +1466,7 @@ export default function OverviewPage() {
                       },
                     ]}
                   />
+                  </div>
                 ),
               },
             ]}

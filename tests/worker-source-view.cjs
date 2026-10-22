@@ -39,12 +39,52 @@ const raw = {
   "Tháng nhận việc": "Tháng 05",
 };
 const result = parser.parseImportRow(raw, true);
-assert.equal(result.assignment.workingFactory, "B");
+assert.equal(result.assignment.workingFactory, "B", "working factory is optional source information");
 assert.equal(result.assignment.contractType, "CTV");
 assert.equal(result.assignment.leaveDate, "không rõ");
 assert.equal(result.worker.phone, "khôngrõ");
+const trainingColumns = parser.parseImportRow(
+  {
+    "Nhà máy PV": "A",
+    "Họ và tên": "QA",
+    "Số CCCD": "000000000001",
+    "Đón xe + KTX": "Có xe, ở KTX",
+    "TÌNH TRẠNG ĐÀO TẠO": "Đã hoàn thành",
+  },
+  true,
+);
+assert.equal(trainingColumns.assignment.shuttleBusKtx, "Có xe, ở KTX");
+assert.equal(trainingColumns.assignment.expectedTrainingStatus, "Đã hoàn thành");
+const workbookHeaders = parser.parseImportRow(
+  {
+    "Nhà máy PV": "A",
+    "Họ và tên": "QA",
+    "Số CCCD": "000000000001",
+    "Đón xe - KTX": 0,
+    "Tình trạng Đào tạo dự kiến": "OK",
+  },
+  true,
+);
+assert.equal(workbookHeaders.assignment.shuttleBusKtx, "0");
+assert.equal(workbookHeaders.assignment.expectedTrainingStatus, "OK");
+const mappedTrainingLabel = parser.parseImportRow(
+  {
+    "Nhà máy PV": "A",
+    "Họ và tên": "QA",
+    "Số CCCD": "000000000001",
+    "TT ĐT dự kiến": "OK",
+  },
+  true,
+);
+assert.equal(mappedTrainingLabel.assignment.expectedTrainingStatus, "OK");
 assert.throws(() => parser.parseImportRow(raw));
 deps["@/lib/worker-source-view"] = load("src/lib/worker-source-view.ts");
+const normalizedSource = deps["@/lib/worker-source-view"].normalizeWorkerSourceValues({
+  "Đón xe - KTX": 0,
+  "Tình trạng Đào tạo dự kiến": "OK",
+});
+assert.equal(normalizedSource["Đón xe + KTX"], 0);
+assert.equal(normalizedSource["Tình trạng đào tạo"], "OK");
 const view = deps["@/lib/worker-source-view"].workerSourceView(
   { phone: "changed" },
   {
@@ -52,14 +92,29 @@ const view = deps["@/lib/worker-source-view"].workerSourceView(
       {
         note:
           "Import Excel — source:" +
-          JSON.stringify({ values: raw, warnings: ["SĐT cần kiểm tra"] }),
+          JSON.stringify({
+            values: {
+              ...raw,
+              "Đón xe - KTX": 0,
+              "Tình trạng Đào tạo dự kiến": "OK",
+            },
+            warnings: ["SĐT cần kiểm tra"],
+          }),
       },
     ],
   },
 );
 assert.equal(view.values["SĐT"], "không rõ");
-assert.equal(view.values["Nhà máy làm việc"], "B");
+assert.equal(view.values["Nhà máy làm việc"], undefined, "retired column must not be exposed");
+assert.equal(view.values["Đón xe + KTX"], 0);
+assert.equal(view.values["Tình trạng đào tạo"], "OK");
 assert.equal(view.warnings.length, 1);
 console.log(
   "PASS source fields, incomplete data retained, leave fields retained, original snapshot overrides canonical and warning preserved",
 );
+
+const current = deps["@/lib/worker-source-view"].workerSourceView({phone:"updated"}, {interviewFactory:"Approved factory", status:"NH", events:[{note:"Import Excel — source:"+JSON.stringify({values:{"Nhà máy PV":"Old factory","Tình trạng":"Bỏ ĐT",SĐT:"old"}})}]}, true);
+assert.equal(current.values["Nhà máy PV"], "Approved factory");
+assert.equal(current.values["Tình trạng"], "NH");
+assert.equal(current.values.SĐT, "updated");
+console.log("PASS approved current values override old import snapshot");
