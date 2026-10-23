@@ -3,7 +3,7 @@ import {
   normalizeCccd,
   formatExcelDate,
 } from "@/lib/worker-validation";
-import { sourceHeader, sourceRewardAmount, sourceRewardParts, sourceRewardText } from "@/lib/source-format";
+import { sourceHeader, sourceBonusAmounts, sourceRewardParts, sourceRewardText } from "@/lib/source-format";
 import { splitImportReview } from "@/lib/import-review";
 const norm = (v: unknown) =>
   String(v ?? "")
@@ -68,15 +68,16 @@ export function sourcePaidReport(
           (!code || String(a.employeeCode || worker.code || "") === code),
       );
       let paid = 0;
+      let amountInvalid = false;
       const warnings: string[] = [];
-      for (let stage = 1; stage <= 7; stage++)
-        try {
-          const part = sourceRewardParts(v, stage);
-          paid += part.split && /^[-–—]$/.test(String(part.value ?? "").trim())
-            ? 0 : sourceRewardAmount(part.value);
-        } catch {
-          warnings.push("Có nội dung tiền chưa đọc được; cần đối chiếu");
-        }
+      try {
+        const amounts = sourceBonusAmounts(v);
+        paid = amounts.totalBonus;
+        warnings.push(...amounts.amountWarnings);
+      } catch {
+        amountInvalid = true;
+        warnings.push("Có nội dung tiền chưa đọc được; cần đối chiếu");
+      }
       unique.set(key, {
         id: `source-${source.id}-${r.row}`,
         key,
@@ -89,6 +90,7 @@ export function sourcePaidReport(
         workerCode: code,
         policy: String(v["Chính sách"] || ""),
         paid,
+        amountInvalid,
         sourceRewards: rewards.join(" · "),
         sourceFile: source.file,
         sourceRow: r.row,
@@ -214,7 +216,7 @@ export function sourcePaidReport(
           : r.linked
             ? "Đã liên kết hồ sơ"
             : "Nguồn Excel — chưa liên kết đợt",
-      counted: !r.conflicting && !r.warnings.length,
+      counted: !r.conflicting && !r.amountInvalid,
     }));
   const groups = new Map<string, any>();
   for (const r of rows) {
@@ -227,7 +229,7 @@ export function sourcePaidReport(
     };
     g.rows++;
     if (r.counted) g.paid += r.paid;
-    else g.pending++;
+    if (!r.counted || r.warnings.length) g.pending++;
     if (!r.linked) g.unlinked++;
     groups.set(r.company, g);
   }
@@ -236,7 +238,7 @@ export function sourcePaidReport(
     rows,
     companies: [...groups.values()],
     unlinked: rows.filter((r) => !r.linked).length,
-    pending: rows.filter((r) => !r.counted).length,
+    pending: rows.filter((r) => !r.counted || r.warnings.length).length,
     skippedDuplicates,
   };
 }

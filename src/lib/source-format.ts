@@ -79,3 +79,59 @@ export function sourceRewardText(row: Record<string, unknown>, stage: number) {
     ? [part.name, String(part.value ?? "").trim(), part.reason].filter(Boolean).join(" | ")
     : String(part.value ?? "").trim();
 }
+
+export function parseSourceRewardAmount(value: unknown, label: string) {
+  const source = String(value ?? "").trim();
+  if (!source || /^[-–—]$/.test(source)) return { amount: 0 };
+
+  let amount: number;
+  try {
+    amount = sourceRewardAmount(value);
+  } catch (error: any) {
+    if (error?.message === "Tiền thưởng không hợp lệ") throw error;
+    const match =
+      /([0-9]+(?:[.,][0-9]+)?)\s*(triệu|tr|million|m|nghìn|ngàn|k)(?=\s|$|[^\p{L}])/iu.exec(
+        source,
+      );
+    if (!match)
+      return {
+        amount: 0,
+        warning: `${label}: giữ nguyên nội dung nguồn; không suy ra được số tiền từ “${source}”.`,
+      };
+    const numericValue = Number(match[1].replace(",", "."));
+    const multiplier = /^(triệu|tr|million|m)$/i.test(match[2])
+      ? 1_000_000
+      : 1_000;
+    amount = Math.round(numericValue * multiplier);
+  }
+
+  if (!Number.isSafeInteger(amount) || amount < 0)
+    throw new Error(`${label}: số tiền vượt giới hạn an toàn`);
+  return { amount };
+}
+
+
+export function sourceBonusAmounts(raw: Record<string, unknown>) {
+  const bonusResults = Array.from({ length: 7 }, (_, index) =>
+    parseSourceRewardAmount(
+      sourceRewardParts(raw, index + 1).value,
+      `Thưởng lần ${index + 1}`,
+    ),
+  );
+  const bonuses = bonusResults.map((result) => result.amount);
+  const amountWarnings = bonusResults.flatMap((result) =>
+    result.warning ? [result.warning] : [],
+  );
+  const totalCell = Object.entries(raw).find(([header]) => ["tong thuong", "tong tien thuong"].includes(normalizedRewardHeader(header)))?.[1];
+  let totalBonus = bonuses.reduce((sum, amount) => sum + amount, 0);
+  if (!Array.from({ length: 7 }, (_, i) => sourceRewardParts(raw, i + 1).split).some(Boolean) &&
+      totalCell !== undefined && totalCell !== null && totalCell !== "") {
+    const totalResult = parseSourceRewardAmount(totalCell, "Tổng thưởng");
+    if (totalResult.warning) amountWarnings.push(totalResult.warning);
+    else totalBonus = totalResult.amount;
+  }
+  if (!Number.isSafeInteger(totalBonus) || totalBonus < 0)
+    throw new Error("Tổng thưởng vượt giới hạn số nguyên an toàn");
+
+  return { bonuses, totalBonus, amountWarnings };
+}
